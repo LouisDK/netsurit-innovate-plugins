@@ -1,0 +1,8 @@
+{
+  "name": "questionpad",
+  "description": "Collects structured user feedback via an interactive browser UI with typed cards, opened via Playwright MCP",
+  "version": "0.1.0",
+  "author": {
+    "name": "louisdk"
+  }
+}

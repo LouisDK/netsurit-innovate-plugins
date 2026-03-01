@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuestionPad</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1a2e;
+  --card-bg: #16213e;
+  --card-border: #1a1a4e;
+  --card-hover: #4a4a8e;
+  --text: #e0e0e0;
+  --muted: #8888aa;
+  --approve: #1a7f37;
+  --approve-hover: #2ea043;
+  --reject: #cf222e;
+  --reject-hover: #e53e3e;
+  --amber: #bf8700;
+  --green: #1a7f37;
+  --grey: #555;
+  --progress: #4a6fa5;
+  --submit: #4a6fa5;
+  --submit-hover: #5a7fb5;
+  --font-ui: system-ui, -apple-system, sans-serif;
+  --font-code: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg);
+  padding: 16px 20px 0;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.header h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.header .progress-count {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.progress-bar-wrap {
+  max-width: 800px;
+  margin: 10px auto 0;
+  height: 4px;
+  background: var(--card-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--progress);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* Main */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  padding-bottom: 180px;
+}
+
+.cards {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Card */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: border-color 0.2s;
+}
+
+.card:hover {
+  border-color: var(--card-hover);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--amber);
+}
+
+.status-dot.answered { background: var(--green); }
+.status-dot.skipped { background: var(--grey); }
+
+.card-type-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  background: rgba(74,106,165,0.25);
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.card-answer-summary {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-left: auto;
+  flex-shrink: 0;
+  max-width: 250px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-body {
+  margin-top: 14px;
+}
+
+.card.collapsed .card-body {
+  display: none;
+}
+
+/* Markdown */
+.md-content { margin-bottom: 14px; }
+.md-content h1 { font-size: 1.4rem; margin: 12px 0 6px; }
+.md-content h2 { font-size: 1.25rem; margin: 10px 0 5px; }
+.md-content h3 { font-size: 1.1rem; margin: 8px 0 4px; }
+.md-content h4 { font-size: 1rem; margin: 6px 0 4px; }
+.md-content h5 { font-size: 0.95rem; margin: 6px 0 4px; }
+.md-content h6 { font-size: 0.9rem; margin: 6px 0 4px; color: var(--muted); }
+.md-content p { margin: 6px 0; }
+.md-content strong { font-weight: 700; }
+.md-content em { font-style: italic; }
+.md-content code {
+  font-family: var(--font-code);
+  background: rgba(255,255,255,0.07);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.md-content pre {
+  background: rgba(0,0,0,0.3);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.md-content pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.md-content ul, .md-content ol { padding-left: 24px; margin: 6px 0; }
+.md-content li { margin: 2px 0; }
+.md-content blockquote {
+  border-left: 3px solid var(--card-hover);
+  padding-left: 12px;
+  color: var(--muted);
+  margin: 8px 0;
+}
+
+/* Form controls */
+.option-group { display: flex; flex-direction: column; gap: 8px; }
+
+.option-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.option-label:hover { border-color: var(--card-hover); background: rgba(74,74,138,0.1); }
+.option-label.selected { border-color: var(--progress); background: rgba(74,106,165,0.15); }
+
+.option-label input[type="radio"],
+.option-label input[type="checkbox"] {
+  accent-color: var(--progress);
+  width: 16px;
+  height: 16px;
+}
+
+/* Yes/No toggle */
+.toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-label { color: var(--muted); font-size: 0.9rem; }
+.toggle-label.active { color: var(--text); font-weight: 600; }
+
+.toggle-switch {
+  width: 50px;
+  height: 26px;
+  background: var(--reject);
+  border-radius: 13px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle-switch.on { background: var(--approve); }
+
+.toggle-switch .toggle-knob {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: left 0.2s;
+}
+
+.toggle-switch.on .toggle-knob { left: 26px; }
+
+/* Approve/Reject */
+.approve-reject-group {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-approve, .btn-reject {
+  flex: 1;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-approve { background: var(--approve); }
+.btn-approve:hover { background: var(--approve-hover); }
+.btn-approve.selected { box-shadow: 0 0 0 3px rgba(26,127,55,0.4); }
+
+.btn-reject { background: var(--reject); }
+.btn-reject:hover { background: var(--reject-hover); }
+.btn-reject.selected { box-shadow: 0 0 0 3px rgba(207,34,46,0.4); }
+
+/* Free text */
+.free-text-area {
+  width: 100%;
+  min-height: 80px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 10px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.free-text-area:focus { outline: none; border-color: var(--progress); }
+
+/* Rating */
+.rating-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rating-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.rating-btn:hover { border-color: var(--card-hover); background: rgba(74,74,138,0.15); }
+.rating-btn.selected { background: var(--progress); border-color: var(--progress); font-weight: 700; }
+
+/* Slider */
+.slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-wrap input[type="range"] {
+  flex: 1;
+  accent-color: var(--progress);
+  height: 24px;
+  cursor: pointer;
+}
+
+.slider-value-input {
+  width: 70px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  color: var(--text);
+  text-align: center;
+  padding: 4px;
+  font-size: 0.9rem;
+}
+
+.slider-value-input:focus { outline: none; border-color: var(--progress); }
+
+.slider-input {
+  width: 70px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  color: var(--text);
+  text-align: center;
+  padding: 4px;
+  font-size: 0.9rem;
+}
+.slider-input:focus { outline: none; border-color: var(--progress); }
+
+/* Range slider */
+.range-slider-container {
+  position: relative;
+  height: 48px;
+  margin: 10px 0;
+}
+
+.range-slider-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 6px;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+
+.range-slider-fill {
+  position: absolute;
+  top: 50%;
+  height: 6px;
+  transform: translateY(-50%);
+  background: var(--progress);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.range-slider-container input[type="range"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+  margin: 0;
+  cursor: pointer;
+}
+
+.range-slider-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  background: var(--progress);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.range-slider-container input[type="range"]::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+
+.range-slider-container input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: var(--progress);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.range-slider-container input[type="range"]::-moz-range-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+
+.range-slider-container input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: transparent;
+}
+
+.range-slider-container input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: transparent;
+}
+
+.range-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.range-slider-values {
+  text-align: center;
+  color: var(--text);
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+/* Comment */
+.comment-toggle {
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-top: 12px;
+  display: inline-block;
+}
+
+.comment-toggle:hover { color: var(--text); }
+
+.comment-area {
+  display: none;
+  margin-top: 8px;
+}
+
+.comment-area.open { display: block; }
+
+.comment-area textarea {
+  width: 100%;
+  min-height: 50px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 8px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.comment-area textarea:focus { outline: none; border-color: var(--progress); }
+
+/* Skip */
+.skip-link {
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-top: 8px;
+  display: inline-block;
+}
+
+.skip-link:hover { color: var(--text); text-decoration: underline; }
+
+/* Footer */
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--card-border);
+  padding: 12px 20px;
+  z-index: 100;
+}
+
+.footer-inner {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.global-comment {
+  width: 100%;
+  min-height: 40px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 8px;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.global-comment:focus { outline: none; border-color: var(--progress); }
+
+.btn-submit {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--submit);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-submit:hover:not(:disabled) { background: var(--submit-hover); }
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Waiting */
+.waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+/* Submitted overlay */
+.submitted-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,26,46,0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.submitted-banner {
+  background: var(--card-bg);
+  border: 1px solid var(--green);
+  border-radius: 12px;
+  padding: 40px 60px;
+  text-align: center;
+}
+
+.submitted-banner h2 {
+  color: var(--green);
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.submitted-banner p {
+  color: var(--muted);
+}
+
+/* Responsive */
+@media (max-width: 500px) {
+  .header { padding: 12px 12px 0; }
+  .main { padding: 12px; padding-bottom: 170px; }
+  .card { padding: 14px; }
+  .footer { padding: 10px 12px; }
+  .approve-reject-group { flex-direction: column; }
+  .rating-btn { width: 34px; height: 34px; font-size: 0.9rem; }
+  .card-answer-summary { max-width: 120px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app-waiting" class="waiting">Waiting for data...</div>
+<div id="app-root" style="display:none;">
+  <div class="header">
+    <div class="header-top">
+      <h1 id="req-title"></h1>
+      <span class="progress-count" id="progress-count"></span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-bar"></div>
+    </div>
+  </div>
+  <div class="main">
+    <div class="cards" id="cards-container"></div>
+  </div>
+  <div class="footer">
+    <div class="footer-inner">
+      <textarea class="global-comment" id="global-comment" placeholder="Overall feedback (optional)..." rows="2"></textarea>
+      <button class="btn-submit" id="btn-submit" disabled>Submit All Feedback</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  let requestData = null;
+  let answers = {};    // cardId -> answer object
+  let comments = {};   // cardId -> comment string
+  let statuses = {};   // cardId -> 'unanswered' | 'answered' | 'skipped'
+  let submitted = false;
+
+  // --- Markdown renderer ---
+  function renderMarkdown(text) {
+    if (!text) return '';
+    const lines = text.split('\n');
+    let html = '';
+    let inCodeBlock = false;
+    let codeLines = [];
+    let inUl = false;
+    let inOl = false;
+
+    function closeLists() {
+      let s = '';
+      if (inUl) { s += '</ul>'; inUl = false; }
+      if (inOl) { s += '</ol>'; inOl = false; }
+      return s;
+    }
+
+    function inlineFormat(line) {
+      // Escape HTML
+      line = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      // Inline code
+      line = line.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Bold
+      line = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      // Italic
+      line = line.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      return line;
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i];
+
+      // Fenced code block
+      if (raw.trimStart().startsWith('```')) {
+        if (!inCodeBlock) {
+          html += closeLists();
+          inCodeBlock = true;
+          codeLines = [];
+        } else {
+          const escaped = codeLines.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          html += '<pre><code>' + escaped + '</code></pre>';
+          inCodeBlock = false;
+        }
+        continue;
+      }
+      if (inCodeBlock) {
+        codeLines.push(raw);
+        continue;
+      }
+
+      const trimmed = raw.trim();
+
+      // Empty line
+      if (trimmed === '') {
+        html += closeLists();
+        continue;
+      }
+
+      // Headers
+      const hMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+      if (hMatch) {
+        html += closeLists();
+        const level = hMatch[1].length;
+        html += '<h' + level + '>' + inlineFormat(hMatch[2]) + '</h' + level + '>';
+        continue;
+      }
+
+      // Blockquote
+      if (trimmed.startsWith('> ')) {
+        html += closeLists();
+        html += '<blockquote>' + inlineFormat(trimmed.slice(2)) + '</blockquote>';
+        continue;
+      }
+
+      // Unordered list
+      if (trimmed.startsWith('- ')) {
+        if (inOl) { html += '</ol>'; inOl = false; }
+        if (!inUl) { html += '<ul>'; inUl = true; }
+        html += '<li>' + inlineFormat(trimmed.slice(2)) + '</li>';
+        continue;
+      }
+
+      // Ordered list
+      const olMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
+      if (olMatch) {
+        if (inUl) { html += '</ul>'; inUl = false; }
+        if (!inOl) { html += '<ol>'; inOl = true; }
+        html += '<li>' + inlineFormat(olMatch[2]) + '</li>';
+        continue;
+      }
+
+      // Paragraph
+      html += closeLists();
+      html += '<p>' + inlineFormat(trimmed) + '</p>';
+    }
+
+    // Close unclosed
+    if (inCodeBlock) {
+      const escaped = codeLines.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      html += '<pre><code>' + escaped + '</code></pre>';
+    }
+    html += closeLists();
+    return html;
+  }
+
+  // --- Answer summary ---
+  function getAnswerSummary(card, answer) {
+    if (!answer) return '';
+    switch (card.type) {
+      case 'multiple-choice': return answer.choice || '';
+      case 'multi-select': return (answer.choices || []).join(', ');
+      case 'yes-no': return answer.value ? 'Yes' : 'No';
+      case 'approve-reject': return answer.status === 'approved' ? 'Approved' : 'Rejected';
+      case 'free-text': {
+        const t = (answer.text || '').trim();
+        return t.length > 40 ? t.slice(0, 40) + '...' : t;
+      }
+      case 'rating': return answer.rating + ' / ' + (card.max || 5);
+      case 'slider': return String(answer.value);
+      case 'range-slider': return (answer.value || []).join(' - ');
+      default: return '';
+    }
+  }
+
+  // --- Update progress ---
+  function updateProgress() {
+    if (!requestData) return;
+    const total = requestData.cards.length;
+    let answered = 0;
+    for (const c of requestData.cards) {
+      if (statuses[c.id] === 'answered' || statuses[c.id] === 'skipped') answered++;
+    }
+    document.getElementById('progress-count').textContent = answered + ' of ' + total + ' answered';
+    document.getElementById('progress-bar').style.width = (total ? (answered / total * 100) : 0) + '%';
+
+    // Submit button
+    const btn = document.getElementById('btn-submit');
+    const requiredCards = requestData.cards.filter(c => c.required);
+    const requiredRemaining = requiredCards.filter(c => statuses[c.id] !== 'answered').length;
+    if (requiredRemaining > 0) {
+      btn.disabled = true;
+      btn.textContent = 'Submit (' + requiredRemaining + ' required remaining)';
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Submit All Feedback';
+    }
+    if (submitted) btn.disabled = true;
+  }
+
+  // --- Set answer ---
+  function setAnswer(cardId, answer) {
+    if (submitted) return;
+    answers[cardId] = answer;
+    statuses[cardId] = 'answered';
+    updateProgress();
+    updateCardUI(cardId);
+  }
+
+  // --- Update single card UI ---
+  function updateCardUI(cardId) {
+    const el = document.getElementById('card-' + cardId);
+    if (!el) return;
+    const dot = el.querySelector('.status-dot');
+    dot.className = 'status-dot';
+    if (statuses[cardId] === 'answered') dot.classList.add('answered');
+    else if (statuses[cardId] === 'skipped') dot.classList.add('skipped');
+
+    const card = requestData.cards.find(c => c.id === cardId);
+    const summaryEl = el.querySelector('.card-answer-summary');
+    // Card types where a single click/tap completes the answer
+    const instantTypes = ['multiple-choice', 'approve-reject', 'yes-no', 'rating'];
+    const isInstant = instantTypes.includes(card.type);
+
+    if (statuses[cardId] === 'answered') {
+      summaryEl.textContent = getAnswerSummary(card, answers[cardId]);
+      // Auto-collapse only for instant-answer types on first answer,
+      // and never if the user manually re-opened the card to edit
+      if (isInstant && !el.dataset.userExpanded) {
+        el.classList.add('collapsed');
+      }
+    } else if (statuses[cardId] === 'skipped') {
+      summaryEl.textContent = 'Skipped';
+      el.classList.add('collapsed');
+    } else {
+      summaryEl.textContent = '';
+    }
+  }
+
+  // --- Build card ---
+  function buildCard(card) {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.id = 'card-' + card.id;
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'card-header';
+    header.innerHTML =
+      '<span class="status-dot"></span>' +
+      '<span class="card-type-badge">' + card.type + '</span>' +
+      '<span class="card-title">' + escapeHtml(card.title || '') + '</span>' +
+      '<span class="card-answer-summary"></span>';
+    header.addEventListener('click', function() {
+      if (submitted) return;
+      const isCollapsed = div.classList.contains('collapsed');
+      div.classList.toggle('collapsed');
+      // Track when user manually expands a card so we don't auto-collapse it
+      if (isCollapsed) {
+        div.dataset.userExpanded = 'true';
+      } else {
+        delete div.dataset.userExpanded;
+      }
+    });
+    div.appendChild(header);
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'card-body';
+
+    // Markdown content
+    if (card.body) {
+      const md = document.createElement('div');
+      md.className = 'md-content';
+      md.innerHTML = renderMarkdown(card.body);
+      body.appendChild(md);
+    }
+
+    // Control
+    const control = document.createElement('div');
+    control.className = 'card-control';
+    buildControl(control, card);
+    body.appendChild(control);
+
+    // Comment
+    const commentToggle = document.createElement('span');
+    commentToggle.className = 'comment-toggle';
+    commentToggle.textContent = 'Add a comment...';
+    const commentArea = document.createElement('div');
+    commentArea.className = 'comment-area';
+    commentArea.innerHTML = '<textarea placeholder="Your comment..."></textarea>';
+    commentToggle.addEventListener('click', function() {
+      commentArea.classList.toggle('open');
+      if (commentArea.classList.contains('open')) {
+        commentArea.querySelector('textarea').focus();
+      }
+    });
+    commentArea.querySelector('textarea').addEventListener('input', function() {
+      comments[card.id] = this.value;
+    });
+    body.appendChild(commentToggle);
+    body.appendChild(commentArea);
+
+    // Skip
+    if (!card.required) {
+      const skip = document.createElement('span');
+      skip.className = 'skip-link';
+      skip.textContent = 'Skip';
+      skip.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (submitted) return;
+        statuses[card.id] = 'skipped';
+        delete answers[card.id];
+        updateProgress();
+        updateCardUI(card.id);
+      });
+      body.appendChild(document.createElement('br'));
+      body.appendChild(skip);
+    }
+
+    div.appendChild(body);
+    return div;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // --- Build control per type ---
+  function buildControl(container, card) {
+    switch (card.type) {
+      case 'multiple-choice':
+        buildMultipleChoice(container, card);
+        break;
+      case 'multi-select':
+        buildMultiSelect(container, card);
+        break;
+      case 'yes-no':
+        buildYesNo(container, card);
+        break;
+      case 'approve-reject':
+        buildApproveReject(container, card);
+        break;
+      case 'free-text':
+        buildFreeText(container, card);
+        break;
+      case 'rating':
+        buildRating(container, card);
+        break;
+      case 'slider':
+        buildSlider(container, card);
+        break;
+      case 'range-slider':
+        buildRangeSlider(container, card);
+        break;
+    }
+  }
+
+  function buildMultipleChoice(container, card) {
+    const group = document.createElement('div');
+    group.className = 'option-group';
+    const name = 'mc-' + card.id;
+    (card.options || []).forEach(function(opt) {
+      const label = document.createElement('label');
+      label.className = 'option-label';
+      label.innerHTML = '<input type="radio" name="' + name + '" value="' + escapeHtml(opt) + '"> <span>' + escapeHtml(opt) + '</span>';
+      label.querySelector('input').addEventListener('change', function() {
+        group.querySelectorAll('.option-label').forEach(l => l.classList.remove('selected'));
+        label.classList.add('selected');
+        setAnswer(card.id, { choice: opt });
+      });
+      group.appendChild(label);
+    });
+    container.appendChild(group);
+  }
+
+  function buildMultiSelect(container, card) {
+    const group = document.createElement('div');
+    group.className = 'option-group';
+    (card.options || []).forEach(function(opt) {
+      const label = document.createElement('label');
+      label.className = 'option-label';
+      label.innerHTML = '<input type="checkbox" value="' + escapeHtml(opt) + '"> <span>' + escapeHtml(opt) + '</span>';
+      label.querySelector('input').addEventListener('change', function() {
+        label.classList.toggle('selected', this.checked);
+        const chosen = [];
+        group.querySelectorAll('input:checked').forEach(function(inp) {
+          chosen.push(inp.value);
+        });
+        if (chosen.length > 0) {
+          setAnswer(card.id, { choices: chosen });
+        } else {
+          delete answers[card.id];
+          statuses[card.id] = 'unanswered';
+          updateProgress();
+          updateCardUI(card.id);
+        }
+      });
+      group.appendChild(label);
+    });
+    container.appendChild(group);
+  }
+
+  function buildYesNo(container, card) {
+    const wrap = document.createElement('div');
+    wrap.className = 'toggle-wrap';
+    const defaultVal = card.default === true;
+    let currentVal = defaultVal;
+
+    const noLabel = document.createElement('span');
+    noLabel.className = 'toggle-label' + (!currentVal ? ' active' : '');
+    noLabel.textContent = 'No';
+
+    const toggle = document.createElement('div');
+    toggle.className = 'toggle-switch' + (currentVal ? ' on' : '');
+    toggle.innerHTML = '<div class="toggle-knob"></div>';
+
+    const yesLabel = document.createElement('span');
+    yesLabel.className = 'toggle-label' + (currentVal ? ' active' : '');
+    yesLabel.textContent = 'Yes';
+
+    function updateToggle(val) {
+      currentVal = val;
+      toggle.classList.toggle('on', val);
+      noLabel.classList.toggle('active', !val);
+      yesLabel.classList.toggle('active', val);
+      setAnswer(card.id, { value: val });
+    }
+
+    toggle.addEventListener('click', function() {
+      if (submitted) return;
+      updateToggle(!currentVal);
+    });
+
+    noLabel.addEventListener('click', function() {
+      if (submitted) return;
+      updateToggle(false);
+    });
+
+    yesLabel.addEventListener('click', function() {
+      if (submitted) return;
+      updateToggle(true);
+    });
+
+    noLabel.style.cursor = 'pointer';
+    yesLabel.style.cursor = 'pointer';
+
+    wrap.appendChild(noLabel);
+    wrap.appendChild(toggle);
+    wrap.appendChild(yesLabel);
+    container.appendChild(wrap);
+
+    // Show default visual state but don't mark as answered until user interacts
+  }
+
+  function buildApproveReject(container, card) {
+    const group = document.createElement('div');
+    group.className = 'approve-reject-group';
+    const approveBtn = document.createElement('button');
+    approveBtn.className = 'btn-approve';
+    approveBtn.textContent = 'Approve';
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'btn-reject';
+    rejectBtn.textContent = 'Reject';
+
+    approveBtn.addEventListener('click', function() {
+      if (submitted) return;
+      approveBtn.classList.add('selected');
+      rejectBtn.classList.remove('selected');
+      setAnswer(card.id, { status: 'approved' });
+    });
+
+    rejectBtn.addEventListener('click', function() {
+      if (submitted) return;
+      rejectBtn.classList.add('selected');
+      approveBtn.classList.remove('selected');
+      setAnswer(card.id, { status: 'rejected' });
+    });
+
+    group.appendChild(approveBtn);
+    group.appendChild(rejectBtn);
+    container.appendChild(group);
+  }
+
+  function buildFreeText(container, card) {
+    const ta = document.createElement('textarea');
+    ta.className = 'free-text-area';
+    ta.placeholder = card.placeholder || 'Type your response...';
+    ta.addEventListener('input', function() {
+      if (submitted) return;
+      if (ta.value.trim()) {
+        setAnswer(card.id, { text: ta.value });
+      } else {
+        delete answers[card.id];
+        statuses[card.id] = 'unanswered';
+        updateProgress();
+        const el = document.getElementById('card-' + card.id);
+        if (el) {
+          el.querySelector('.status-dot').className = 'status-dot';
+          el.querySelector('.card-answer-summary').textContent = '';
+        }
+      }
+    });
+    container.appendChild(ta);
+  }
+
+  function buildRating(container, card) {
+    const group = document.createElement('div');
+    group.className = 'rating-group';
+    const min = card.min != null ? card.min : 1;
+    const max = card.max != null ? card.max : 5;
+    for (let i = min; i <= max; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'rating-btn';
+      btn.textContent = i;
+      btn.dataset.val = i;
+      btn.addEventListener('click', function() {
+        if (submitted) return;
+        group.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        setAnswer(card.id, { rating: i });
+      });
+      group.appendChild(btn);
+    }
+    container.appendChild(group);
+  }
+
+  function buildSlider(container, card) {
+    const wrap = document.createElement('div');
+    wrap.className = 'slider-wrap';
+    const min = card.min != null ? card.min : 0;
+    const max = card.max != null ? card.max : 100;
+    const step = card.step != null ? card.step : 1;
+    const def = card.default != null ? card.default : min;
+
+    const range = document.createElement('input');
+    range.type = 'range';
+    range.min = min;
+    range.max = max;
+    range.step = step;
+    range.value = def;
+
+    const numInput = document.createElement('input');
+    numInput.type = 'number';
+    numInput.className = 'slider-value-input';
+    numInput.min = min;
+    numInput.max = max;
+    numInput.step = step;
+    numInput.value = def;
+
+    range.addEventListener('input', function() {
+      numInput.value = range.value;
+      setAnswer(card.id, { value: parseFloat(range.value) });
+    });
+
+    numInput.addEventListener('input', function() {
+      let v = parseFloat(numInput.value);
+      if (isNaN(v)) return;
+      if (v < min) v = min;
+      if (v > max) v = max;
+      range.value = v;
+      numInput.value = v;
+      setAnswer(card.id, { value: v });
+    });
+
+    wrap.appendChild(range);
+    wrap.appendChild(numInput);
+    container.appendChild(wrap);
+  }
+
+  function buildRangeSlider(container, card) {
+    const min = card.min != null ? card.min : 0;
+    const max = card.max != null ? card.max : 100;
+    const step = card.step != null ? card.step : 1;
+    const defMin = card.defaultMin != null ? card.defaultMin : min;
+    const defMax = card.defaultMax != null ? card.defaultMax : max;
+
+    const sliderContainer = document.createElement('div');
+    sliderContainer.className = 'range-slider-container';
+
+    const track = document.createElement('div');
+    track.className = 'range-slider-track';
+    sliderContainer.appendChild(track);
+
+    const fill = document.createElement('div');
+    fill.className = 'range-slider-fill';
+    sliderContainer.appendChild(fill);
+
+    const rangeMin = document.createElement('input');
+    rangeMin.type = 'range';
+    rangeMin.min = min;
+    rangeMin.max = max;
+    rangeMin.step = step;
+    rangeMin.value = defMin;
+    rangeMin.style.zIndex = '2';
+
+    const rangeMax = document.createElement('input');
+    rangeMax.type = 'range';
+    rangeMax.min = min;
+    rangeMax.max = max;
+    rangeMax.step = step;
+    rangeMax.value = defMax;
+    rangeMax.style.zIndex = '3';
+
+    sliderContainer.appendChild(rangeMin);
+    sliderContainer.appendChild(rangeMax);
+
+    const labels = document.createElement('div');
+    labels.className = 'range-slider-labels';
+    labels.innerHTML = '<span>' + min + '</span><span>' + max + '</span>';
+
+    const valuesRow = document.createElement('div');
+    valuesRow.className = 'range-slider-values';
+    valuesRow.style.display = 'flex';
+    valuesRow.style.alignItems = 'center';
+    valuesRow.style.gap = '8px';
+    valuesRow.style.justifyContent = 'center';
+    valuesRow.style.marginTop = '8px';
+
+    const inputMin = document.createElement('input');
+    inputMin.type = 'number';
+    inputMin.min = min;
+    inputMin.max = max;
+    inputMin.step = step;
+    inputMin.value = defMin;
+    inputMin.className = 'slider-input';
+
+    const dashLabel = document.createElement('span');
+    dashLabel.textContent = ' — ';
+    dashLabel.style.color = 'var(--muted)';
+
+    const inputMax = document.createElement('input');
+    inputMax.type = 'number';
+    inputMax.min = min;
+    inputMax.max = max;
+    inputMax.step = step;
+    inputMax.value = defMax;
+    inputMax.className = 'slider-input';
+
+    valuesRow.appendChild(inputMin);
+    valuesRow.appendChild(dashLabel);
+    valuesRow.appendChild(inputMax);
+
+    function updateFill() {
+      const lo = parseFloat(rangeMin.value);
+      const hi = parseFloat(rangeMax.value);
+      const pctLo = ((lo - min) / (max - min)) * 100;
+      const pctHi = ((hi - min) / (max - min)) * 100;
+      fill.style.left = pctLo + '%';
+      fill.style.width = (pctHi - pctLo) + '%';
+    }
+
+    function syncFromSliders() {
+      const lo = parseFloat(rangeMin.value);
+      const hi = parseFloat(rangeMax.value);
+      inputMin.value = lo;
+      inputMax.value = hi;
+      updateFill();
+      setAnswer(card.id, { value: [lo, hi] });
+    }
+
+    function syncFromInputs() {
+      let lo = parseFloat(inputMin.value);
+      let hi = parseFloat(inputMax.value);
+      lo = Math.max(min, Math.min(max, isNaN(lo) ? min : lo));
+      hi = Math.max(min, Math.min(max, isNaN(hi) ? max : hi));
+      if (lo > hi) lo = hi;
+      inputMin.value = lo;
+      inputMax.value = hi;
+      rangeMin.value = lo;
+      rangeMax.value = hi;
+      updateFill();
+      setAnswer(card.id, { value: [lo, hi] });
+    }
+
+    rangeMin.addEventListener('input', function() {
+      if (parseFloat(rangeMin.value) > parseFloat(rangeMax.value)) {
+        rangeMin.value = rangeMax.value;
+      }
+      syncFromSliders();
+    });
+
+    rangeMax.addEventListener('input', function() {
+      if (parseFloat(rangeMax.value) < parseFloat(rangeMin.value)) {
+        rangeMax.value = rangeMin.value;
+      }
+      syncFromSliders();
+    });
+
+    inputMin.addEventListener('change', syncFromInputs);
+    inputMax.addEventListener('change', syncFromInputs);
+
+    container.appendChild(sliderContainer);
+    container.appendChild(labels);
+    container.appendChild(valuesRow);
+
+    updateFill();
+  }
+
+  // --- Render app ---
+  function render() {
+    if (!requestData || !requestData.cards) return;
+
+    // Clear previous submission data
+    localStorage.removeItem('questionpad-response');
+    localStorage.removeItem('questionpad-submitted');
+
+    document.getElementById('app-waiting').style.display = 'none';
+    document.getElementById('app-root').style.display = '';
+    document.getElementById('req-title').textContent = requestData.title || 'Feedback Request';
+
+    const container = document.getElementById('cards-container');
+    container.innerHTML = '';
+
+    // Reset state
+    answers = {};
+    comments = {};
+    statuses = {};
+    submitted = false;
+
+    requestData.cards.forEach(function(card) {
+      statuses[card.id] = 'unanswered';
+      comments[card.id] = '';
+    });
+
+    requestData.cards.forEach(function(card) {
+      container.appendChild(buildCard(card));
+    });
+
+    // Submit handler
+    document.getElementById('btn-submit').onclick = function() {
+      if (submitted) return;
+      doSubmit();
+    };
+
+    updateProgress();
+  }
+
+  // --- Submit ---
+  function doSubmit() {
+    submitted = true;
+
+    const response = {
+      id: requestData.id,
+      submittedAt: new Date().toISOString(),
+      answers: requestData.cards.map(function(card) {
+        const ans = answers[card.id] || {};
+        const obj = { cardId: card.id };
+        // Merge answer fields
+        for (const k in ans) {
+          obj[k] = ans[k];
+        }
+        obj.comment = comments[card.id] || '';
+        return obj;
+      }),
+      globalComment: document.getElementById('global-comment').value || ''
+    };
+
+    localStorage.setItem('questionpad-response', JSON.stringify(response));
+    localStorage.setItem('questionpad-submitted', 'true');
+
+    // Disable all controls
+    document.querySelectorAll('input, textarea, button, select').forEach(function(el) {
+      el.disabled = true;
+    });
+    document.querySelectorAll('.toggle-switch, .option-label, .skip-link, .comment-toggle').forEach(function(el) {
+      el.style.pointerEvents = 'none';
+    });
+
+    // Show overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'submitted-overlay';
+    overlay.innerHTML = '<div class="submitted-banner"><h2>Submitted!</h2><p>Your feedback has been recorded.</p></div>';
+    document.body.appendChild(overlay);
+
+    updateProgress();
+  }
+
+  // --- Public API ---
+  window.loadRequestData = function() {
+    if (window.REQUEST_DATA) {
+      requestData = window.REQUEST_DATA;
+      render();
+    }
+  };
+
+  // --- Init on load ---
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.REQUEST_DATA) window.loadRequestData();
+    });
+  } else {
+    if (window.REQUEST_DATA) window.loadRequestData();
+  }
+
+})();
+</script>
+
+</body>
+</html>
