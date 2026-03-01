@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Inquiry Report</title>
+  <style>
+    :root {
+      --bg: #0f1117; --bg2: #1a1d27; --fg: #e2e8f0; --fg-muted: #94a3b8;
+      --accent: #6366f1; --border: #2d3148; --card: #1e2235;
+      --confirmed: #22c55e; --refuted: #ef4444; --pivoted: #f97316; --inconclusive: #94a3b8;
+      --critical: #ef4444; --methodological: #f97316; --enhancement: #6366f1; --style-tier: #64748b;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc; --bg2: #ffffff; --fg: #0f172a; --fg-muted: #64748b;
+      --accent: #4f46e5; --border: #e2e8f0; --card: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; }
+    .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; }
+    h2 { font-size: 0.8rem; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+    h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .header { border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+    .header-meta { color: var(--fg-muted); font-size: 0.875rem; margin-top: 0.25rem; }
+    .status-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .status-Done, .status-Complete { background: #14532d; color: #86efac; }
+    .status-Abandoned, .status-Failed { background: #431407; color: #fdba74; }
+    .status-InProgress, .status-Active { background: #1e3a5f; color: #93c5fd; }
+    .section { margin-bottom: 2.5rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1.25rem; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--fg-muted); border-radius: 0.375rem; padding: 0.3rem 0.7rem; cursor: pointer; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0; }
+    ul { padding-left: 1.25rem; }
+    ul li { margin-bottom: 0.3rem; font-size: 0.9rem; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    footer { border-top: 1px solid var(--border); margin-top: 3rem; padding-top: 1.5rem; text-align: center; color: var(--fg-muted); font-size: 0.8rem; font-style: italic; }
+    @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } .arc-flow { flex-direction: column !important; } }
+    @media print { .theme-toggle { display: none; } body { background: white; color: black; } }
+
+    /* Hypothesis arc */
+    .arc-flow { display: flex; align-items: stretch; }
+    .arc-node { flex: 1; background: var(--card); border: 1px solid var(--border); padding: 1rem; }
+    .arc-node:first-child { border-radius: 0.5rem 0 0 0.5rem; }
+    .arc-node:last-child { border-radius: 0 0.5rem 0.5rem 0; }
+    .arc-node + .arc-node { border-left: none; }
+    .arc-arrow { display: flex; align-items: center; padding: 0 0.3rem; color: var(--fg-muted); flex-shrink: 0; }
+    .arc-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); margin-bottom: 0.4rem; }
+    .arc-text { font-size: 0.875rem; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; vertical-align: middle; }
+    .dot-confirmed { background: var(--confirmed); }
+    .dot-refuted { background: var(--refuted); }
+    .dot-pivoted { background: var(--pivoted); }
+    .dot-inconclusive { background: var(--inconclusive); }
+    .hypothesis-item + .hypothesis-item { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+    /* Review log */
+    .review-mode-badge { font-size: 0.75rem; color: var(--fg-muted); margin-bottom: 1rem; }
+    .tier-row { margin-bottom: 1.25rem; }
+    .tier-header { display: flex; justify-content: space-between; margin-bottom: 0.3rem; }
+    .tier-label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+    .tier-count { font-size: 0.75rem; color: var(--fg-muted); }
+    .tier-bar-bg { background: var(--bg2); border-radius: 4px; height: 6px; }
+    .tier-bar { height: 6px; border-radius: 4px; min-width: 0; transition: width 0.5s ease; }
+    .bar-critical { background: var(--critical); }
+    .bar-methodological { background: var(--methodological); }
+    .bar-enhancement { background: var(--enhancement); }
+    .bar-style { background: var(--style-tier); }
+    .tier-items { margin-top: 0.6rem; }
+    .tier-item { font-size: 0.8rem; color: var(--fg-muted); padding: 0.35rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 0.5rem; align-items: flex-start; }
+    .tier-item:last-child { border-bottom: none; }
+    .action-pill { font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 9999px; white-space: nowrap; flex-shrink: 0; margin-top: 0.1rem; }
+    .action-fixed { background: #14532d; color: #86efac; }
+    .action-addressed { background: #365314; color: #bef264; }
+    .action-documented { background: #1e1b4b; color: #a5b4fc; }
+    .action-ignored { background: #1e293b; color: #94a3b8; }
+
+    /* Findings */
+    .finding-item { padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+    .finding-item:last-child { border-bottom: none; }
+    .finding-evidence { font-size: 0.75rem; color: var(--fg-muted); font-family: monospace; margin-top: 0.3rem; }
+
+    /* Timeline */
+    .timeline { position: relative; padding-bottom: 0.5rem; }
+    .timeline-track { position: absolute; top: 1.25rem; left: 5%; right: 5%; height: 2px; background: var(--border); }
+    .timeline-nodes { display: flex; justify-content: space-around; position: relative; padding-bottom: 0.5rem; }
+    .timeline-node { text-align: center; cursor: pointer; flex: 1; }
+    .timeline-node:hover .timeline-label { color: var(--accent); }
+    .timeline-dot { width: 16px; height: 16px; border-radius: 50%; margin: 0 auto 0.5rem; border: 2px solid var(--border); position: relative; z-index: 1; }
+    .tdot-Done, .tdot-Success, .tdot-Complete { background: var(--confirmed); border-color: var(--confirmed); }
+    .tdot-Partial { background: var(--pivoted); border-color: var(--pivoted); }
+    .tdot-Abandoned, .tdot-Failed { background: var(--refuted); border-color: var(--refuted); }
+    .timeline-label { font-size: 0.75rem; font-weight: 600; }
+    .timeline-sublabel { font-size: 0.7rem; color: var(--fg-muted); }
+    .timeline-detail { display: none; background: var(--card); border: 1px solid var(--accent); border-radius: 0.5rem; padding: 1rem; margin-top: 0.75rem; text-align: left; font-size: 0.875rem; }
+    .timeline-detail.open { display: block; }
+
+    /* Insight gallery */
+    .insight-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+    .insight-card { background: var(--card); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; }
+    .insight-card.high { border-left: 3px solid var(--accent); }
+    .insight-meta { font-size: 0.7rem; color: var(--fg-muted); display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+    .star { color: #fbbf24; }
+    .insight-detail { font-size: 0.8rem; color: var(--fg-muted); margin-top: 0.4rem; }
+
+    /* Decision log */
+    .decision-item { padding: 0.75rem 0; border-bottom: 1px solid var(--border); display: flex; gap: 1rem; align-items: flex-start; }
+    .decision-item:last-child { border-bottom: none; }
+    .decision-badge { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 9999px; white-space: nowrap; flex-shrink: 0; margin-top: 0.15rem; }
+    .badge-Pivot { background: #431407; color: #fdba74; }
+    .badge-Done, .badge-Complete { background: #14532d; color: #86efac; }
+    .badge-Pause { background: #1e3a5f; color: #93c5fd; }
+    .badge-Abandon { background: #27272a; color: #a1a1aa; }
+    .decision-text { font-size: 0.875rem; font-weight: 600; }
+    .decision-reasoning { font-size: 0.8rem; color: var(--fg-muted); margin-top: 0.2rem; }
+  </style>
+</head>
+<body>
+<div class="container" id="app">
+  <p style="color:var(--fg-muted);font-size:0.9rem;">Waiting for report data…</p>
+</div>
+<script>
+function el(tag, attrs) {
+  var e = document.createElement(tag);
+  var children = Array.prototype.slice.call(arguments, 2);
+  var a = attrs || {};
+  for (var k in a) {
+    if (k === 'class') e.className = a[k];
+    else if (k === 'html') e.innerHTML = a[k];
+    else e.setAttribute(k, a[k]);
+  }
+  for (var i = 0; i < children.length; i++) {
+    var c = children[i];
+    if (c == null) continue;
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  }
+  return e;
+}
+
+function statusBadge(s) {
+  return el('span', { class: 'status-badge status-' + s.replace(/\s/g, '') }, s);
+}
+
+function themeToggle() {
+  var btn = el('button', { class: 'theme-toggle' }, '☀ Light');
+  btn.onclick = function() {
+    var html = document.documentElement;
+    var isLight = html.getAttribute('data-theme') === 'light';
+    html.setAttribute('data-theme', isLight ? 'dark' : 'light');
+    btn.textContent = isLight ? '☀ Light' : '☾ Dark';
+  };
+  return btn;
+}
+
+function pageFooter() {
+  return el('footer', {}, 'Deep Inquiry plugin by Louis de Klerk from Netsurit');
+}
+
+/* ── Iteration renderers ── */
+
+function renderHypothesisArc(hypotheses) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Hypothesis Arc'));
+  for (var i = 0; i < hypotheses.length; i++) {
+    var h = hypotheses[i];
+    var flow = el('div', { class: 'arc-flow' });
+    var formed = el('div', { class: 'arc-node' },
+      el('div', { class: 'arc-label' }, 'Formed'),
+      el('div', { class: 'arc-text' }, h.text)
+    );
+    var tested = el('div', { class: 'arc-node' },
+      el('div', { class: 'arc-label' }, 'Tested'),
+      el('div', { class: 'arc-text' }, h.tested)
+    );
+    var outcomeEl = el('div', { class: 'arc-text' });
+    outcomeEl.appendChild(el('span', { class: 'status-dot dot-' + h.status }));
+    outcomeEl.appendChild(document.createTextNode(h.outcome));
+    var concluded = el('div', { class: 'arc-node' },
+      el('div', { class: 'arc-label' }, 'Concluded'),
+      outcomeEl
+    );
+    flow.appendChild(formed);
+    flow.appendChild(el('div', { class: 'arc-arrow' }, '→'));
+    flow.appendChild(tested);
+    flow.appendChild(el('div', { class: 'arc-arrow' }, '→'));
+    flow.appendChild(concluded);
+    var wrapper = el('div', { class: 'hypothesis-item' });
+    wrapper.appendChild(flow);
+    section.appendChild(wrapper);
+  }
+  return section;
+}
+
+function renderReviewLog(reviewLog) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Review Log'));
+  var card = el('div', { class: 'card' });
+  var modeText = reviewLog.mode === 'adversarial'
+    ? 'Adversarial review via OpenRouter — Models: ' + reviewLog.models.join(', ')
+    : '⚠ Degraded self-review (OpenRouter unavailable)';
+  card.appendChild(el('div', { class: 'review-mode-badge' }, modeText));
+  var tiers = [
+    { key: 'critical',       label: 'Critical',       barClass: 'bar-critical' },
+    { key: 'methodological', label: 'Methodological', barClass: 'bar-methodological' },
+    { key: 'enhancement',    label: 'Enhancement',    barClass: 'bar-enhancement' },
+    { key: 'style',          label: 'Style',          barClass: 'bar-style' }
+  ];
+  var maxCount = 1;
+  for (var ti = 0; ti < tiers.length; ti++) {
+    var cnt = (reviewLog.tiers[tiers[ti].key] || []).length;
+    if (cnt > maxCount) maxCount = cnt;
+  }
+  for (var ti = 0; ti < tiers.length; ti++) {
+    var tier = tiers[ti];
+    var items = reviewLog.tiers[tier.key] || [];
+    var row = el('div', { class: 'tier-row' });
+    row.appendChild(el('div', { class: 'tier-header' },
+      el('span', { class: 'tier-label' }, tier.label),
+      el('span', { class: 'tier-count' }, items.length + ' item' + (items.length !== 1 ? 's' : ''))
+    ));
+    var barBg = el('div', { class: 'tier-bar-bg' });
+    var bar = el('div', { class: 'tier-bar ' + tier.barClass });
+    bar.style.width = items.length === 0 ? '0%' : Math.round((items.length / maxCount) * 100) + '%';
+    barBg.appendChild(bar);
+    row.appendChild(barBg);
+    if (items.length > 0) {
+      var list = el('div', { class: 'tier-items' });
+      for (var ii = 0; ii < items.length; ii++) {
+        var item = items[ii];
+        var itemEl = el('div', { class: 'tier-item' },
+          el('span', { class: 'action-pill action-' + item.action }, item.action)
+        );
+        var textEl = el('span', {});
+        textEl.appendChild(document.createTextNode(item.issue));
+        if (item.detail) {
+          textEl.appendChild(el('div', { style: 'font-size:0.75rem;margin-top:0.15rem;' }, '→ ' + item.detail));
+        }
+        itemEl.appendChild(textEl);
+        list.appendChild(itemEl);
+      }
+      row.appendChild(list);
+    }
+    card.appendChild(row);
+  }
+  section.appendChild(card);
+  return section;
+}
+
+function renderFindings(findings) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Key Findings'));
+  var card = el('div', { class: 'card' });
+  for (var i = 0; i < findings.length; i++) {
+    var f = findings[i];
+    var item = el('div', { class: 'finding-item' },
+      el('h3', {}, f.heading),
+      el('p', { style: 'font-size:0.875rem;' }, f.detail)
+    );
+    if (f.evidence) item.appendChild(el('div', { class: 'finding-evidence' }, 'Evidence: ' + f.evidence));
+    card.appendChild(item);
+  }
+  section.appendChild(card);
+  return section;
+}
+
+function renderIteration(data) {
+  var app = document.getElementById('app');
+  app.innerHTML = '';
+  var headerLeft = el('div', {});
+  var topLine = el('div', { style: 'display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;' },
+    el('h1', {}, data.meta.topic + ' — Iteration ' + data.meta.iterationNumber),
+    statusBadge(data.meta.status)
+  );
+  headerLeft.appendChild(topLine);
+  if (data.meta.title) {
+    headerLeft.appendChild(el('p', { style: 'margin-top:0.25rem;font-size:0.95rem;color:var(--fg-muted);' }, data.meta.title));
+  }
+  headerLeft.appendChild(el('div', { class: 'header-meta' },
+    data.meta.domain + ' · ' + data.meta.mode + ' mode · ' + data.meta.date
+  ));
+  app.appendChild(el('div', { class: 'header' }, headerLeft, themeToggle()));
+  app.appendChild(renderHypothesisArc(data.hypotheses));
+  app.appendChild(renderReviewLog(data.reviewLog));
+  app.appendChild(renderFindings(data.findings));
+  var twoCol = el('div', { class: 'two-col section' });
+  if (data.domainInterpretation) {
+    twoCol.appendChild(el('div', {},
+      el('h2', {}, 'Domain Interpretation'),
+      el('div', { class: 'card' }, data.domainInterpretation)
+    ));
+  }
+  if (data.futureDirections && data.futureDirections.length) {
+    var card = el('div', { class: 'card' });
+    var ul = el('ul', {});
+    for (var i = 0; i < data.futureDirections.length; i++) ul.appendChild(el('li', {}, data.futureDirections[i]));
+    card.appendChild(ul);
+    twoCol.appendChild(el('div', {}, el('h2', {}, 'Future Directions'), card));
+  }
+  if (twoCol.children.length) app.appendChild(twoCol);
+  app.appendChild(pageFooter());
+}
+
+/* ── Summary renderers ── */
+
+function renderTimeline(iterations) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Iteration Timeline'));
+  var timeline = el('div', { class: 'timeline' });
+  timeline.appendChild(el('div', { class: 'timeline-track' }));
+  var nodesRow = el('div', { class: 'timeline-nodes' });
+  var details = [];
+  for (var i = 0; i < iterations.length; i++) {
+    var iter = iterations[i];
+    var dotClass = 'tdot-' + (iter.status || iter.outcome || 'Partial');
+    var node = el('div', { class: 'timeline-node' },
+      el('div', { class: 'timeline-dot ' + dotClass }),
+      el('div', { class: 'timeline-label' }, 'It. ' + iter.number),
+      el('div', { class: 'timeline-sublabel' }, iter.outcome || iter.status || '')
+    );
+    var detail = el('div', { class: 'timeline-detail' });
+    detail.appendChild(el('strong', {}, iter.title || ('Iteration ' + iter.number)));
+    if (iter.goal) detail.appendChild(el('p', { style: 'margin-top:0.4rem;' }, 'Goal: ' + iter.goal));
+    if (iter.pivotReason) {
+      detail.appendChild(el('p', { style: 'margin-top:0.4rem;color:var(--fg-muted);font-size:0.8rem;' }, 'Pivot reason: ' + iter.pivotReason));
+    }
+    (function(d) {
+      node.onclick = function() {
+        var isOpen = d.classList.contains('open');
+        for (var j = 0; j < details.length; j++) details[j].classList.remove('open');
+        if (!isOpen) d.classList.add('open');
+      };
+    }(detail));
+    nodesRow.appendChild(node);
+    details.push(detail);
+  }
+  timeline.appendChild(nodesRow);
+  for (var i = 0; i < details.length; i++) timeline.appendChild(details[i]);
+  section.appendChild(timeline);
+  return section;
+}
+
+function renderInsightGallery(insights) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Insights'));
+  var grid = el('div', { class: 'insight-grid' });
+  for (var i = 0; i < insights.length; i++) {
+    var ins = insights[i];
+    var card = el('div', { class: 'insight-card' + (ins.significance === 'high' ? ' high' : '') });
+    var meta = el('div', { class: 'insight-meta' }, el('span', {}, 'Iteration ' + ins.iteration));
+    if (ins.significance === 'high') meta.appendChild(el('span', { class: 'star' }, '★'));
+    card.appendChild(meta);
+    card.appendChild(el('h3', {}, ins.heading));
+    if (ins.detail) card.appendChild(el('div', { class: 'insight-detail' }, ins.detail));
+    grid.appendChild(card);
+  }
+  section.appendChild(grid);
+  return section;
+}
+
+function renderDecisionLog(decisionLog) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Decision Log'));
+  var card = el('div', { class: 'card' });
+  for (var i = 0; i < decisionLog.length; i++) {
+    var entry = decisionLog[i];
+    var textEl = el('div', {},
+      el('div', { class: 'decision-text' }, 'After Iteration ' + entry.afterIteration)
+    );
+    if (entry.reasoning) textEl.appendChild(el('div', { class: 'decision-reasoning' }, entry.reasoning));
+    card.appendChild(el('div', { class: 'decision-item' },
+      el('span', { class: 'decision-badge badge-' + entry.decision }, entry.decision),
+      textEl
+    ));
+  }
+  section.appendChild(card);
+  return section;
+}
+
+function renderSummary(data) {
+  var app = document.getElementById('app');
+  app.innerHTML = '';
+  var headerLeft = el('div', {});
+  var topLine = el('div', { style: 'display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;' },
+    el('h1', {}, data.meta.topic),
+    statusBadge(data.meta.status)
+  );
+  headerLeft.appendChild(topLine);
+  headerLeft.appendChild(el('div', { class: 'header-meta' },
+    data.meta.domain + ' · ' + data.meta.iterations.length + ' iterations · ' +
+    data.meta.dateRange.from + ' → ' + data.meta.dateRange.to
+  ));
+  if (data.meta.overallGoal) {
+    headerLeft.appendChild(el('p', { style: 'margin-top:0.3rem;font-size:0.875rem;color:var(--fg-muted);' }, data.meta.overallGoal));
+  }
+  app.appendChild(el('div', { class: 'header' }, headerLeft, themeToggle()));
+  if (data.conclusion) {
+    app.appendChild(el('div', { class: 'section' },
+      el('h2', {}, 'Conclusion'),
+      el('div', { class: 'card', style: 'font-size:1rem;line-height:1.7;' }, data.conclusion)
+    ));
+  }
+  app.appendChild(renderTimeline(data.iterations));
+  if (data.insights && data.insights.length) app.appendChild(renderInsightGallery(data.insights));
+  if (data.decisionLog && data.decisionLog.length) app.appendChild(renderDecisionLog(data.decisionLog));
+  var twoCol = el('div', { class: 'two-col section' });
+  if (data.lessonsLearned && data.lessonsLearned.length) {
+    var card = el('div', { class: 'card' });
+    var ul = el('ul', {});
+    for (var i = 0; i < data.lessonsLearned.length; i++) ul.appendChild(el('li', {}, data.lessonsLearned[i]));
+    card.appendChild(ul);
+    twoCol.appendChild(el('div', {}, el('h2', {}, 'Lessons Learned'), card));
+  }
+  if (data.futureDirections && data.futureDirections.length) {
+    var card2 = el('div', { class: 'card' });
+    var ul2 = el('ul', {});
+    for (var i = 0; i < data.futureDirections.length; i++) ul2.appendChild(el('li', {}, data.futureDirections[i]));
+    card2.appendChild(ul2);
+    twoCol.appendChild(el('div', {}, el('h2', {}, 'Future Directions'), card2));
+  }
+  if (twoCol.children.length) app.appendChild(twoCol);
+  app.appendChild(pageFooter());
+}
+
+/* ── Entry point ── */
+window.loadReportData = function() {
+  var data = window.REPORT_DATA;
+  if (!data) return;
+  if (data.type === 'iteration') renderIteration(data);
+  else if (data.type === 'summary') renderSummary(data);
+  else document.getElementById('app').textContent = 'Unknown report type: ' + data.type;
+};
+
+if (window.REPORT_DATA) window.loadReportData();
+</script>
+</body>
+</html>
