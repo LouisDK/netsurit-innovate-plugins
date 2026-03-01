@@ -306,6 +306,15 @@ If different review models give contradictory feedback:
 
 ## Phase 5: Documentation & Results
 
+### Generate Iteration Report
+
+After finalising the iteration README, generate a self-contained HTML report:
+- Construct the `type: "iteration"` JSON from this iteration's hypotheses, findings, review log, domain interpretation, and future directions
+- Write `inquiry/<topic>/iteration_<N>/report.html` using the agent's report generation instructions
+- This report is shareable — it has no external dependencies and opens in any browser
+
+For a multi-iteration summary report spanning all iterations, invoke `@deep-inquiry-reporter`.
+
 ### Iteration README Template
 
 ```markdown
