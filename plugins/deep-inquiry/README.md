@@ -123,6 +123,31 @@ inquiry/
 
 ---
 
+## Reports
+
+Every iteration automatically produces a self-contained HTML report at the end of Phase 5:
+
+```
+inquiry/<topic>/iteration_N/report.html
+```
+
+Open it in any browser — no server needed. Shows the hypothesis arc, review log with tier
+breakdown, key findings, domain interpretation, and future directions.
+
+For a richer summary across all iterations, invoke the reporter agent:
+
+```
+@deep-inquiry-reporter
+```
+
+This reads all finished iteration data and produces `inquiry/<topic>/report.html` — a full
+arc view with iteration timeline, insight gallery, decision log, and lessons learned.
+
+Both report types share the same template and include a dark/light theme toggle. They are
+printable to PDF from the browser.
+
+---
+
 ## Examples
 
 ### Performance debugging (Code mode)
