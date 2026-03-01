@@ -161,6 +161,77 @@ Create this structure at the start of Phase 2. Use `Bash` to create directories.
 
 ---
 
+## Phase 5: Generating the Iteration Report
+
+At the end of Phase 5 (after finalising the iteration README), generate a self-contained
+HTML report for this iteration.
+
+### Step 1: Construct iteration JSON
+
+Build the `type: "iteration"` JSON from this iteration's data:
+
+```json
+{
+  "type": "iteration",
+  "meta": {
+    "topic": "<topic-slug>",
+    "domain": "<domain from session variables>",
+    "mode": "<Code|Reasoning|Evidence|Mixed>",
+    "date": "<today YYYY-MM-DD>",
+    "status": "<Done|Abandoned|InProgress>",
+    "iterationNumber": <N>,
+    "title": "<iteration title from README heading>"
+  },
+  "hypotheses": [
+    {
+      "text": "<hypothesis text>",
+      "tested": "<how it was tested>",
+      "outcome": "<what was found>",
+      "status": "confirmed|refuted|pivoted|inconclusive"
+    }
+  ],
+  "findings": [
+    { "heading": "<heading>", "detail": "<detail>", "evidence": "<evidence reference or null>" }
+  ],
+  "reviewLog": {
+    "mode": "adversarial|degraded",
+    "models": ["<model IDs used>"],
+    "tiers": {
+      "critical":       [{ "issue": "<issue>", "action": "fixed|addressed|documented|ignored", "detail": "<what was done>" }],
+      "methodological": [],
+      "enhancement":    [],
+      "style":          []
+    }
+  },
+  "domainInterpretation": "<domain interpretation text>",
+  "futureDirections": ["<future direction 1>"]
+}
+```
+
+### Step 2: Write the report file
+
+Read `${CLAUDE_PLUGIN_ROOT}/assets/report-template.html` as a string.
+
+Write `inquiry/<topic>/iteration_<N>/report.html`:
+- Prepend: `<script>window.REPORT_DATA = <JSON>;</script>\n`
+- Append: full contents of `report-template.html`
+
+### Step 3: Open in browser for immediate preview
+
+```bash
+cd ${CLAUDE_PLUGIN_ROOT} && python3 -m http.server 18924 &
+```
+
+Navigate to `http://localhost:18924/../../inquiry/<topic>/iteration_<N>/report.html`.
+
+Tell the user: *"Iteration report written to `inquiry/<topic>/iteration_<N>/report.html`. For a full multi-iteration summary, invoke `@deep-inquiry-reporter`."*
+
+Close browser after user acknowledges.
+
+**If Playwright is unavailable:** Skip opening; just tell the user the file path.
+
+---
+
 ## Investigation Mode Guidance
 
 Establish the mode in Phase 1.3 (Domain Scoping). Use these heuristics:
