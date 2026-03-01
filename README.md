@@ -38,6 +38,19 @@ Collects structured user feedback via an interactive browser UI with typed cards
 
 **Requires:** [Playwright MCP plugin](https://github.com/anthropics/claude-code-plugins) enabled in Claude Code.
 
+### Deep Inquiry
+
+Hypothesis-driven adversarial investigation for any domain. Forms theories, tests them with
+available tools, subjects findings to adversarial LLM peer review via OpenRouter, and pivots
+based on evidence. Works for software debugging, legal analysis, business strategy, creative
+work, or any complex problem requiring rigorous iterative investigation.
+
+**Includes:**
+- `@deep-inquiry` agent — standalone turnkey investigator
+- `deep-inquiry-methodology` skill — embeddable methodology for domain-specific agents
+
+**Requires:** [OpenRouter MCP](https://openrouter.ai) for full adversarial review (graceful fallback to self-review if unavailable).
+
 ## Adding New Plugins
 
 To add a plugin to this marketplace:
