@@ -14,6 +14,14 @@
         "name": "louisdk"
       },
       "category": "productivity"
+    },
+    {
+      "name": "deep-inquiry",
+      "source": "./plugins/deep-inquiry",
+      "description": "Hypothesis-driven adversarial investigation for any domain. Forms theories, tests them, gets adversarial LLM review via OpenRouter, and pivots based on evidence.",
+      "version": "0.1.0",
+      "author": { "name": "louisdk" },
+      "category": "productivity"
     }
   ]
 }
