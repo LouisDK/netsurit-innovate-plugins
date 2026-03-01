@@ -1,0 +1,64 @@
+{
+  "type": "summary",
+  "meta": {
+    "topic": "auth-performance",
+    "domain": "Software",
+    "overallGoal": "Find root cause of 3s checkout latency and validate fix",
+    "status": "Complete",
+    "dateRange": { "from": "2026-02-28", "to": "2026-03-02" }
+  },
+  "conclusion": "N+1 ORM queries confirmed as the root cause of 3s checkout latency. Adding select_related('tax_rate') reduces p99 from 3.1s to 0.4s. Fix is safe to deploy; regression test added.",
+  "iterations": [
+    {
+      "number": 1,
+      "title": "Flame graph profiling",
+      "goal": "Identify slow code paths using py-spy flame graph",
+      "outcome": "Partial",
+      "pivotReason": "Flame graph showed DB time but couldn't isolate query-level patterns",
+      "status": "Abandoned"
+    },
+    {
+      "number": 2,
+      "title": "Query-level profiling with django-debug-toolbar",
+      "goal": "Count and identify individual DB queries per request",
+      "outcome": "Success",
+      "pivotReason": null,
+      "status": "Done"
+    }
+  ],
+  "insights": [
+    {
+      "iteration": 2,
+      "heading": "47% of queries are redundant tax_rate lookups",
+      "detail": "Each of 18 line items triggers a separate SELECT. Eliminating this reduces p99 by 87%.",
+      "significance": "high"
+    },
+    {
+      "iteration": 1,
+      "heading": "Flame graphs are insufficient for ORM query diagnosis",
+      "detail": "py-spy shows cumulative DB time but not individual query counts or sources.",
+      "significance": "medium"
+    }
+  ],
+  "decisionLog": [
+    {
+      "afterIteration": 1,
+      "decision": "Pivot",
+      "reasoning": "Flame graph confirmed DB is the bottleneck but couldn't pinpoint the query pattern. Needed query-level tooling."
+    },
+    {
+      "afterIteration": 2,
+      "decision": "Done",
+      "reasoning": "Root cause identified, fix validated in staging, regression test written."
+    }
+  ],
+  "lessonsLearned": [
+    "Flame graphs are a poor tool for Django ORM query diagnosis; use django-debug-toolbar or silk",
+    "Always add query count assertions after fixing N+1 bugs to prevent regression"
+  ],
+  "futureDirections": [
+    "Monitor query count per request in production APM",
+    "Benchmark Redis cache layer as complementary optimisation",
+    "Audit other endpoints for similar N+1 patterns"
+  ]
+}

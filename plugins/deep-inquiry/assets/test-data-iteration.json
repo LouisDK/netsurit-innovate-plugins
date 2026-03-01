@@ -1,0 +1,45 @@
+{
+  "type": "iteration",
+  "meta": {
+    "topic": "auth-performance",
+    "domain": "Software",
+    "mode": "Code",
+    "date": "2026-03-02",
+    "status": "Done",
+    "iterationNumber": 2,
+    "title": "Profiler-based N+1 detection"
+  },
+  "hypotheses": [
+    {
+      "text": "Auth slowness caused by N+1 DB queries in tax calculation",
+      "tested": "Ran query profiler across 1000 checkout requests",
+      "outcome": "Confirmed — 47% of all queries were redundant FK lookups",
+      "status": "confirmed"
+    },
+    {
+      "text": "Connection pool exhaustion is a secondary factor",
+      "tested": "Monitored pool wait time under load",
+      "outcome": "Refuted — pool wait time averaged 2ms, negligible",
+      "status": "refuted"
+    }
+  ],
+  "findings": [
+    {
+      "heading": "N+1 pattern confirmed in ORM layer",
+      "detail": "Each checkout line item triggers a separate SELECT for its tax_rate relationship.",
+      "evidence": "profiler: avg 847ms DB calls, 803ms attributable to tax_rate lookups"
+    }
+  ],
+  "reviewLog": {
+    "mode": "adversarial",
+    "models": ["openai/gpt-5.2"],
+    "tiers": {
+      "critical": [{ "issue": "Profiler not accounting for pool overhead", "action": "fixed", "detail": "Added pool timing; results unchanged" }],
+      "methodological": [{ "issue": "Sample size of 100 may not be representative", "action": "addressed", "detail": "Increased to 1000; consistent within 3%" }],
+      "enhancement": [{ "issue": "Could benchmark Redis cache as alternative", "action": "documented", "detail": "Added to future directions" }],
+      "style": []
+    }
+  },
+  "domainInterpretation": "The N+1 pattern is a classic Django ORM pitfall when accessing related models in a loop.",
+  "futureDirections": ["Implement select_related('tax_rate')", "Add query count assertion to tests"]
+}
