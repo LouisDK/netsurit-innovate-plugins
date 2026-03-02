@@ -20,8 +20,8 @@ setInterval(() => store.purgeExpired(), 60_000);
 
 const app = createMcpExpressApp({ host: '0.0.0.0' });
 
-// JSON middleware for API routes
-app.use(express.json());
+// JSON middleware for API routes only (skip /mcp — the MCP transport handles its own body parsing)
+app.use('/api', express.json());
 
 // POST /mcp — stateless MCP handler (fresh McpServer + transport per request)
 app.post('/mcp', async (req, res) => {
