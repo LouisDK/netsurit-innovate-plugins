@@ -10,3 +10,65 @@ Every AI tool can give you an answer. The problem is you can't tell whether the 
 4. **Documents everything** — Every iteration produces a README with hypotheses, methods, findings, review logs, and domain interpretation. Nothing is a black box.
 5. **Produces interactive reports** — Self-contained HTML files with hypothesis arcs, review breakdowns, and findings. Dark/light theme, printable to PDF. No server needed.
 6. **Iterates or concludes** — Based on a pre-agreed iteration budget, it pivots (tries a different approach), continues, or concludes with a summary report across all iterations.
+
+---
+
+## Scenarios by Capability Tier
+
+What Deep Inquiry can do depends on what tools Claude Code has access to. Here are real scenarios across three tiers, from minimal setup to a rich tool ecosystem.
+
+### Tier 1: Minimal Setup (Claude Code + OpenRouter)
+
+These work with just LLM reasoning over training data, local files, and bash. No web search, no special MCP servers. You get structured adversarial analysis — stronger than asking Claude directly, but limited to what the model already knows.
+
+#### "Should we rewrite our monolith into microservices?"
+
+- **Mode:** Reasoning
+- **Data:** Your codebase (local files), your team size and growth projections (you describe them)
+- **What it does:** Forms hypotheses like "Monolith will hit deployment bottleneck at 15 engineers" and "Microservices will increase operational cost by 3x for a team of 5." Adversarial reviewer stress-tests the assumptions. Report delivers argued positions, counterarguments addressed, recommendation with explicit caveats.
+- **Why better than just asking Claude:** Adversarial review catches reasoning gaps, hypothesis structure prevents hand-waving, report is reviewable by your CTO.
+
+#### "Review this vendor contract for hidden risks"
+
+- **Mode:** Evidence
+- **Data:** Paste or provide the contract document
+- **What it does:** Hypothesizes specific risk categories — IP assignment, liability caps, termination clauses, auto-renewal traps. Systematically analyzes each clause. Adversarial reviewer checks for missed risks and misinterpretations. Report catalogs findings by severity.
+- **Caveat:** Not legal advice. This is a structured first-pass that helps you know what questions to bring to your lawyer.
+
+#### "We're choosing between three database technologies for our new service"
+
+- **Mode:** Reasoning
+- **Data:** Your requirements (you describe them), LLM knowledge of the technologies
+- **What it does:** Forms hypotheses about which technology best fits each requirement. Constructs structured arguments. Adversarial reviewer challenges assumptions about scalability, operational complexity, and team expertise fit. Report presents a decision matrix with argued positions.
+
+### Tier 2: With Web Search MCP
+
+Web search changes the game: the agent can verify claims against current information, check pricing, and read live documentation. Claims are verified, not just reasoned about. This is the difference between "I think Kubernetes pricing works like this" and "here's what the current pricing page says."
+
+#### "Evaluate whether we should adopt Kubernetes or stay on ECS"
+
+- **Mode:** Mixed (Reasoning + Evidence)
+- **Data:** LLM knowledge + live documentation lookup + your infrastructure context
+- **What it does:** Researches current pricing, checks latest feature announcements, verifies version compatibility against actual docs. Adversarial reviewer catches stale assumptions. Much stronger than Tier 1 because claims about cost and compatibility are verified against real sources.
+
+#### "Our competitor just launched a feature that threatens our core product. What are our options?"
+
+- **Mode:** Mixed (Reasoning + Evidence)
+- **Data:** Web search for competitor announcements, your product context (you describe it)
+- **What it does:** Investigates the competitive threat with actual current data. Forms hypotheses about impact severity and response strategies. Adversarial reviewer challenges optimistic assumptions — the part of you that wants to believe it's not a big deal.
+
+### Tier 3: Rich MCP Ecosystem (Databases, APIs, Playwright)
+
+This is where Deep Inquiry becomes genuinely powerful — it can work with your actual data, not just reason about it. Connect database MCPs, browser automation, internal APIs, and the investigation reaches into your real systems.
+
+#### "Why is our checkout conversion rate dropping?"
+
+- **Mode:** Mixed (Code + Evidence)
+- **Data:** Database queries against your analytics, Playwright to walk the actual checkout flow, web search for industry benchmarks
+- **What it does:** Forms hypotheses (page load time? form friction? pricing display?), tests them against real data, screenshots the actual user experience, compares to competitors. Adversarial reviewer challenges causal claims — correlation between a deploy date and a drop isn't proof.
+
+#### "Should we expand into the DACH market?"
+
+- **Mode:** Mixed (Reasoning + Evidence)
+- **Data:** Web search for market data, your internal metrics via database MCP, competitor analysis via Playwright
+- **What it does:** Investigates market size, regulatory requirements, competitive landscape, and localization costs. Each claim backed by a source. Adversarial reviewer challenges market assumptions and growth projections — the numbers that feel right but might not survive scrutiny.
