@@ -476,7 +476,13 @@ After completing an iteration:
    - ⏸️ **Pause**: Partial results, document what was learned → generate summary report, stop
    - ❌ **Abandon**: Approach not working, document why → generate summary report, stop
 
-4. **If creating a new iteration**:
+4. **If concluding (Done / Pause / Abandon)**:
+   - Generate the summary report (see "Auto-Generating the Summary Report" in the agent file)
+   - If `isolation_mode` = `worktree`: copy `inquiry/<topic>/report.html` to `$main_tree_path/inquiry/<topic>/report.html`
+   - Tell the user the report location in their main tree (not git-added)
+   - If a worktree was created: print inspection and cleanup instructions (see agent file)
+
+5. **If creating a new iteration**:
    - Increment iteration number
    - Create `iteration_<N+1>/` directory
    - Write clear motivation: why this approach vs. previous?
