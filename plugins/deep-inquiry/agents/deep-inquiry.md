@@ -168,6 +168,97 @@ Create this structure at the start of Phase 2. Use `Bash` to create directories.
 
 ---
 
+## Worktree Isolation
+
+The agent manages its own worktrees to isolate investigations from the main tree. It ONLY
+manages worktrees matching `.claude/worktrees/inquiry-*` — never touches anything else.
+
+### Stale Worktree Detection (Phase 1, before domain scoping)
+
+Only when in the main tree (not already in a worktree). Before asking any Phase 1 questions,
+check for leftover inquiry worktrees:
+
+```bash
+git worktree list | grep '\.claude/worktrees/inquiry-'
+```
+
+If any are found, ask the user:
+
+> Found existing inquiry worktree(s):
+> - `.claude/worktrees/inquiry-<topic>` (branch `inquiry/<topic>`)
+>
+> Options:
+> 1. **Continue** — build on the previous investigation (reuse the worktree)
+> 2. **Start fresh** — remove the old worktree and begin a new inquiry
+> 3. **Keep both** — leave the old one, create a new worktree for this inquiry
+
+If "Start fresh": remove the stale worktree(s) matching `inquiry-*`:
+
+```bash
+MAIN_TREE=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+git worktree remove "$MAIN_TREE/.claude/worktrees/inquiry-<old-topic>"
+git branch -D "inquiry/<old-topic>"
+```
+
+### Worktree Creation (Phase 2, if isolation_mode = worktree)
+
+At the start of Phase 2 (Setup), before creating the `inquiry/` directory structure:
+
+```bash
+MAIN_TREE=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+git worktree add "$MAIN_TREE/.claude/worktrees/inquiry-<topic>" -b "inquiry/<topic>"
+cd "$MAIN_TREE/.claude/worktrees/inquiry-<topic>"
+```
+
+Then proceed with the normal Phase 2 directory creation (`inquiry/<topic>/iteration_1/` etc.)
+inside the worktree.
+
+### Report Copy (Phase 6, on conclusion)
+
+When the investigation concludes (Done / Pause / Abandon with no further iterations), after
+generating the summary report, copy it to the main tree:
+
+```bash
+MAIN_TREE=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+mkdir -p "$MAIN_TREE/inquiry/<topic>"
+cp "inquiry/<topic>/report.html" "$MAIN_TREE/inquiry/<topic>/report.html"
+```
+
+Tell the user:
+
+> *Summary report copied to `inquiry/<topic>/report.html` in your main working tree.
+> It has not been git-added — you can decide whether to commit it.*
+
+This applies regardless of isolation mode. If working in-place, `$MAIN_TREE` is the current
+directory and the copy is a no-op (the report is already there).
+
+### Cleanup (user-initiated)
+
+The agent never auto-cleans worktrees. On conclusion (if a worktree was created), print:
+
+> *The investigation worktree is still at `.claude/worktrees/inquiry-<topic>` — you can
+> inspect iteration files, code changes, and diffs there.*
+>
+> *When you're ready to clean up:*
+> ```
+> @deep-inquiry clean up the <topic> worktree
+> ```
+> *Or manually:*
+> ```
+> git worktree remove .claude/worktrees/inquiry-<topic>
+> git branch -D inquiry/<topic>
+> ```
+
+When the agent receives a cleanup request:
+
+1. Verify the target matches `.claude/worktrees/inquiry-*` — **refuse** if it does not
+2. `cd` to `$MAIN_TREE` (cannot remove a worktree you're standing in)
+3. `git worktree remove .claude/worktrees/inquiry-<topic>`
+4. `git branch -D inquiry/<topic>`
+5. Confirm what was removed
+
+---
+
 ## Phase 5: Generating the Iteration Report
 
 At the end of Phase 5 (after finalising the iteration README), generate a self-contained
