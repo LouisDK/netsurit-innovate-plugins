@@ -32,6 +32,8 @@ At the start of each session, establish and record these:
   - *Mixed* — combination of the above
 - **Iteration budget**: How many iterations are allowed? (default: 1)
 - **Review budget**: Reviews per iteration? (default: 1 comprehensive + 1 optional delta)
+- **Isolation mode**: `worktree` or `in-place` — whether the investigation runs in its own worktree
+- **Main tree path**: Absolute path to the main working tree (for report copy at conclusion)
 
 ---
 
@@ -72,6 +74,37 @@ Example formats:
 
 Ask the user for the iteration limit and review budget per iteration.
 Get explicit confirmation before proceeding.
+
+### 1.6 Isolation Decision
+
+Detect whether you are already inside a git worktree:
+
+```bash
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+GIT_COMMON=$(git rev-parse --git-common-dir 2>/dev/null)
+```
+
+**If `GIT_DIR` ≠ `GIT_COMMON` → you are in a worktree.** Work in-place. The user already
+has isolation. Record `isolation_mode: in-place` in session variables and skip the rest of
+this phase.
+
+**If `GIT_DIR` = `GIT_COMMON` → you are in the main tree.** Offer a worktree based on
+investigation mode:
+
+| Mode | Framing |
+|---|---|
+| Code / Mixed | *"This investigation may modify source files. I recommend an isolated worktree so your main tree stays clean. Use a worktree? (yes/no)"* |
+| Reasoning / Evidence | *"This investigation only creates markdown files. Want to isolate it in a worktree anyway? (yes/no)"* |
+
+Record the user's choice as `isolation_mode: worktree` or `isolation_mode: in-place`.
+
+Also discover and record the main tree path (needed for report copy):
+
+```bash
+MAIN_TREE=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+```
+
+Record as session variable `main_tree_path`.
 
 ---
 
@@ -337,6 +370,8 @@ manually at any time for on-demand reports.
 | Hypotheses | [list] |
 | Iteration budget | N |
 | Review budget | 1 comprehensive / 2 comprehensive + delta |
+| Isolation mode | worktree / in-place |
+| Main tree path | /absolute/path |
 
 ## Overview
 [What this iteration set out to do]
