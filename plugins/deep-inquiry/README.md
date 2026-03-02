@@ -225,3 +225,19 @@ Every iteration produces a self-contained HTML report with the full investigatio
 For on-demand reports at any point during or after an investigation, use `@deep-inquiry-reporter`.
 
 Reports use dark/light theme based on system preference, are printable to PDF, and require no server — just open the HTML file in a browser.
+
+---
+
+## Where This Is Going
+
+Today, Deep Inquiry is a tool you invoke directly. But its architecture — bounded iterations, documented reasoning, adversarial review, structured reports — makes it a natural fit for something bigger: AI agents that need to make complex decisions they can defend.
+
+Consider an AI agent orchestrating a multi-step business process — task lists, approval gates, specialist agents. At some point it hits a decision too complex to just "pick the obvious answer": choosing between database technologies, evaluating vendor proposals, assessing regulatory risk, recommending market entry timing. Instead of hallucinating a choice or escalating every decision to a human (defeating the purpose of automation), it spawns a Deep Inquiry investigation. The investigation runs its full cycle — scoping, hypotheses, evidence gathering, adversarial review, report. Then the orchestrator presents the *report* to a human for approval.
+
+The human reviewer isn't asked "do you trust this AI's judgment?" They're asked "here's the investigation, the hypotheses tested, the adversarial critique, and the recommendation — do you approve?" That's a fundamentally different question. It's the difference between a black-box decision and an auditable one.
+
+This isn't built yet. It requires an orchestration layer that can spawn Deep Inquiry as a subtask and consume its reports programmatically. But the investigation methodology, the report format, and the adversarial review pipeline are all in place today. The gap is integration, not capability.
+
+---
+
+**Author:** Louis de Klerk from Netsurit
