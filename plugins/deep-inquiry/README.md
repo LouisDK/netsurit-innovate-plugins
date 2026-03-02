@@ -72,3 +72,35 @@ This is where Deep Inquiry becomes genuinely powerful — it can work with your 
 - **Mode:** Mixed (Reasoning + Evidence)
 - **Data:** Web search for market data, your internal metrics via database MCP, competitor analysis via Playwright
 - **What it does:** Investigates market size, regulatory requirements, competitive landscape, and localization costs. Each claim backed by a source. Adversarial reviewer challenges market assumptions and growth projections — the numbers that feel right but might not survive scrutiny.
+
+---
+
+## What This Is and Isn't
+
+### What Deep Inquiry IS
+
+- **A structured reasoning framework that makes AI conclusions auditable.** Every hypothesis, every piece of evidence, every reviewer objection — documented and traceable. You don't have to trust the answer; you can read the work.
+- **A methodology enforcer.** Hypothesis-driven, adversarially tested, documented at every step. It imposes the discipline that "just asking Claude" lacks.
+- **A report generator that produces reviewable artifacts, not chat messages.** The output is a standalone document you can hand to your CTO, attach to a decision record, or revisit six months later. It survives beyond the conversation that created it.
+- **As powerful as the tools you give it.** Local files, web search, databases, APIs — each tool you connect raises the ceiling on what it can investigate. Without tools, it reasons over training data. With tools, it reasons over your reality.
+
+### What Deep Inquiry IS NOT
+
+- **A search engine or data collector.** It reasons over data you provide or that it can access through configured tools. It doesn't crawl the web unprompted or maintain a knowledge base between sessions.
+- **A replacement for domain experts.** It's a rigorous first-pass that helps experts focus their time. A Deep Inquiry report on your contract risks tells your lawyer where to look — it doesn't replace your lawyer.
+- **An oracle.** It can be wrong. The adversarial review catches some errors, but the real value is that you can *see the reasoning* and judge for yourself. A wrong answer with visible logic is more useful than a right answer you can't verify.
+- **Magic.** Without web search, it's reasoning over training data. With web search, it can verify claims. With database access, it can query your actual numbers. The quality ceiling rises with the tools you connect.
+
+### Where It Excels
+
+- **Problems where the bottleneck is *structured thinking*, not data collection.** If you already have the information but need it analyzed rigorously — architecture decisions, strategy evaluations, risk assessments — this is the sweet spot.
+- **Decisions where you need to show your work.** Board presentations, architecture reviews, compliance documentation. The report *is* the deliverable.
+- **Situations where a second opinion matters but hiring a consultant takes weeks.** Deep Inquiry won't replace a six-month engagement, but it can give you a structured analysis by tomorrow morning.
+- **Codebase investigations where the evidence is in local files.** Performance issues, dependency risks, architecture reviews — the agent reads the code, forms hypotheses, and tests them against what's actually there.
+
+### Where It Struggles
+
+- **Problems requiring proprietary data you haven't connected via MCP.** It can't query your database if you haven't given it database access. It can't read your Confluence if there's no Confluence MCP. The gap between potential and performance is usually a missing tool connection.
+- **Real-time market data without web search configured.** Training data has a cutoff. Without web search, claims about current pricing, market conditions, or recent events are educated guesses at best.
+- **Anything requiring human interviews, surveys, or physical-world observation.** It can analyze interview transcripts you provide, but it can't conduct the interviews. It reasons over information, not experiences.
+- **Domains where LLM training data is thin or outdated.** Niche industries, very recent technical developments, proprietary frameworks with limited public documentation. The adversarial reviewer will flag low-confidence areas, but thin training data means thin analysis.
