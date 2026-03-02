@@ -209,6 +209,11 @@ If you start a new inquiry and a previous inquiry worktree exists, the agent wil
 whether to continue the old investigation, start fresh (removing the old worktree), or
 keep both side by side.
 
+### Safety
+
+The agent only manages worktrees matching `.claude/worktrees/inquiry-*` and will refuse
+cleanup requests targeting anything else. Your own worktrees are never touched.
+
 ---
 
 ## Output Structure

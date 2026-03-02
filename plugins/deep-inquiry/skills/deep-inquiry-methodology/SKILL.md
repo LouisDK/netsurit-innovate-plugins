@@ -478,9 +478,9 @@ After completing an iteration:
 
 4. **If concluding (Done / Pause / Abandon)**:
    - Generate the summary report (see "Auto-Generating the Summary Report" in the agent file)
-   - If `isolation_mode` = `worktree`: copy `inquiry/<topic>/report.html` to `$main_tree_path/inquiry/<topic>/report.html`
+   - Copy `inquiry/<topic>/report.html` to `$main_tree_path/inquiry/<topic>/report.html` (no-op if working in-place)
    - Tell the user the report location in their main tree (not git-added)
-   - If a worktree was created: print inspection and cleanup instructions (see agent file)
+   - If `isolation_mode` = `worktree`: print inspection and cleanup instructions (see agent file)
 
 5. **If creating a new iteration**:
    - Increment iteration number
