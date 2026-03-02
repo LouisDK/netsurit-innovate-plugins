@@ -95,17 +95,24 @@ Tell the user:
 > To install it, add the following to your Claude Code MCP configuration
 > (`~/.claude/settings.json` under `"mcpServers"`):
 >
+> Add to `.mcp.json` in your project root (or `~/.claude/settings.json` globally):
+>
 > ```json
-> "openrouterai": {
->   "command": "npx",
->   "args": ["-y", "openrouter-mcp"],
->   "env": {
->     "OPENROUTER_API_KEY": "your-api-key-here"
+> {
+>   "mcpServers": {
+>     "openrouterai": {
+>       "command": "npx",
+>       "args": ["@mcpservers/openrouterai"],
+>       "env": {
+>         "OPENROUTER_API_KEY": "sk-or-v1-your-key-here"
+>       }
+>     }
 >   }
 > }
 > ```
 >
-> Get an API key at https://openrouter.ai/keys. Then restart Claude Code.
+> Get an API key at https://openrouter.ai/keys, add credits at
+> https://openrouter.ai/credits, then restart Claude Code.
 >
 > **I can continue with self-review using my own reasoning, but the adversarial quality
 > is reduced — the same model acts as both author and reviewer.**

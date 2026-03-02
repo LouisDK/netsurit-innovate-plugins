@@ -80,7 +80,9 @@ and stops reviewing once no CRITICAL issues remain — not when the work is "per
 
 ## OpenRouter Requirement
 
-Adversarial review requires the [OpenRouter MCP](https://openrouter.ai) to call external models.
+Adversarial review requires the [OpenRouter MCP server](https://github.com/mcpservers/openrouterai)
+to call external models. Without it, the agent falls back to self-review (same model as author
+and reviewer), which reduces adversarial quality.
 
 **If not installed**, the agent will print setup instructions and offer to continue in degraded
 self-review mode.
@@ -88,21 +90,76 @@ self-review mode.
 **If installed but broken**, the agent falls back to self-review automatically with a visible
 warning that adversarial quality is reduced.
 
-### Installing OpenRouter MCP
+### Step 1: Get an OpenRouter API key
+
+1. Go to [openrouter.ai](https://openrouter.ai) and create an account
+2. Navigate to [openrouter.ai/keys](https://openrouter.ai/keys)
+3. Click **Create Key** and copy the key (starts with `sk-or-v1-...`)
+4. Add credits at [openrouter.ai/credits](https://openrouter.ai/credits) — a few dollars
+   is enough for many investigations (reviews typically cost $0.01–0.10 each depending on
+   the model)
+
+### Step 2: Configure the MCP server
+
+Add the OpenRouter MCP server to your Claude Code configuration. You can configure it at
+the **project level** (`.mcp.json` in your repo root) or **globally** (`~/.claude/settings.json`).
+
+**Option A: Project-level** (recommended — keeps config with the project)
+
+Create or edit `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "openrouterai": {
+      "command": "npx",
+      "args": ["@mcpservers/openrouterai"],
+      "env": {
+        "OPENROUTER_API_KEY": "sk-or-v1-your-key-here"
+      }
+    }
+  }
+}
+```
+
+**Option B: Global** (available in all projects)
 
 Add to `~/.claude/settings.json` under `"mcpServers"`:
 
 ```json
 "openrouterai": {
   "command": "npx",
-  "args": ["-y", "openrouter-mcp"],
+  "args": ["@mcpservers/openrouterai"],
   "env": {
-    "OPENROUTER_API_KEY": "your-api-key-here"
+    "OPENROUTER_API_KEY": "sk-or-v1-your-key-here"
   }
 }
 ```
 
-Get an API key at [openrouter.ai/keys](https://openrouter.ai/keys), then restart Claude Code.
+### Step 3: Restart Claude Code
+
+The MCP server is loaded at startup. After adding the configuration, restart Claude Code
+for it to take effect.
+
+### Verifying it works
+
+The agent probes OpenRouter at the start of Phase 4 (adversarial review). You can also
+verify manually by asking Claude Code:
+
+```
+Use the openrouterai search_models tool to search for "claude"
+```
+
+If you see a list of models, the MCP server is working.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `mcp__openrouterai__search_models` not found | MCP config not loaded — check JSON syntax, restart Claude Code |
+| Tool call fails with auth error | API key is invalid or expired — regenerate at openrouter.ai/keys |
+| Tool call fails with credits error | Add credits at openrouter.ai/credits |
+| Agent says "OpenRouter MCP is not installed" | The `openrouterai` key must match exactly — check for typos |
 
 ---
 
