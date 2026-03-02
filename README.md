@@ -63,3 +63,7 @@ To add a plugin to this marketplace:
 ## License
 
 MIT
+
+---
+
+**Author:** Louis de Klerk from Netsurit

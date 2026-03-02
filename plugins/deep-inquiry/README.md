@@ -302,3 +302,7 @@ skills:
   - lcrf-navigator
   - domain-bridge-vocabulary
 ```
+
+---
+
+**Author:** Louis de Klerk from Netsurit

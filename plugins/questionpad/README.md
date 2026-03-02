@@ -221,3 +221,7 @@ If Playwright MCP is unavailable, the agent falls back to a manual workflow:
 ## Version
 
 0.1.0
+
+---
+
+**Author:** Louis de Klerk from Netsurit
