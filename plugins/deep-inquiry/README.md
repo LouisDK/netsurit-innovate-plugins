@@ -104,3 +104,124 @@ This is where Deep Inquiry becomes genuinely powerful — it can work with your 
 - **Real-time market data without web search configured.** Training data has a cutoff. Without web search, claims about current pricing, market conditions, or recent events are educated guesses at best.
 - **Anything requiring human interviews, surveys, or physical-world observation.** It can analyze interview transcripts you provide, but it can't conduct the interviews. It reasons over information, not experiences.
 - **Domains where LLM training data is thin or outdated.** Niche industries, very recent technical developments, proprietary frameworks with limited public documentation. The adversarial reviewer will flag low-confidence areas, but thin training data means thin analysis.
+
+---
+
+## Getting Started
+
+### Quickstart
+
+```
+@deep-inquiry I think our auth service is slow because of N+1 queries. Can you investigate?
+```
+
+The agent will ask you to confirm an iteration budget (how many investigate-review cycles to run), then execute the full methodology: scoping, hypothesis formation, investigation, adversarial review, and reporting.
+
+### Embedding in Domain-Specific Agents
+
+Deep Inquiry works as a skill inside other Claude Code agents. Use the `skills:` frontmatter to combine it with domain knowledge:
+
+```yaml
+---
+name: my-domain-agent
+skills:
+  - deep-inquiry-methodology
+  - my-domain-knowledge
+---
+```
+
+This lets a domain agent invoke the full investigation methodology without duplicating the prompt.
+
+### OpenRouter Setup
+
+The adversarial review step requires a *different* AI model, accessed through the OpenRouter MCP server. This is what makes the review genuinely adversarial rather than self-review. Cost is minimal — typically $0.01–0.10 per review call.
+
+**Step 1: Get an API key**
+
+Go to [openrouter.ai](https://openrouter.ai), create an account, and generate an API key. Add credits — even $1 is enough for dozens of reviews.
+
+**Step 2: Configure the MCP server**
+
+Add the OpenRouter MCP server to your Claude Code configuration. Choose one:
+
+**Project-level** (`.mcp.json` in your project root — scoped to this project):
+
+```json
+{
+  "mcpServers": {
+    "openrouterai": {
+      "command": "npx",
+      "args": ["@mcpservers/openrouterai"],
+      "env": {
+        "OPENROUTER_API_KEY": "sk-or-v1-your-key-here"
+      }
+    }
+  }
+}
+```
+
+**Global** (`~/.claude/settings.json` — available in all projects, add under `"mcpServers"`):
+
+```json
+"openrouterai": {
+  "command": "npx",
+  "args": ["@mcpservers/openrouterai"],
+  "env": {
+    "OPENROUTER_API_KEY": "sk-or-v1-your-key-here"
+  }
+}
+```
+
+**Step 3: Restart Claude Code** for the MCP configuration to take effect.
+
+**Verifying it works**
+
+After restarting, ask Claude Code to call the `search_models` tool:
+
+```
+Can you call mcp__openrouterai__search_models and search for "anthropic"?
+```
+
+If it returns a list of models, the MCP server is working.
+
+**Troubleshooting**
+
+| Symptom | Fix |
+|---|---|
+| `mcp__openrouterai__search_models` not found | MCP config not loaded — check JSON syntax, restart Claude Code |
+| Tool call fails with auth error | API key is invalid or expired — regenerate at openrouter.ai/keys |
+| Tool call fails with credits error | Add credits at openrouter.ai/credits |
+| Agent says "OpenRouter MCP is not installed" | The `openrouterai` key must match exactly — check for typos |
+
+**Graceful degradation:** If OpenRouter is not installed, the agent prints setup instructions and offers to continue with self-review instead. If installed but broken (auth failure, credits exhausted), it falls back to self-review automatically with a warning. Either way, the investigation proceeds — you just get a weaker review step.
+
+### Worktree Isolation
+
+Investigations are exploratory — the agent creates files, runs experiments, and produces artifacts. This shouldn't happen in your working tree where you have uncommitted changes or active work. Deep Inquiry automatically offers to create a git worktree for isolation.
+
+If you're in the main tree, the agent offers to create a worktree before starting. If you're already in a worktree, it works in-place.
+
+When the investigation concludes, the summary report is copied back to your main tree. The worktree remains available for inspection. To clean up: `@deep-inquiry clean up the <topic> worktree` or use standard git commands (`git worktree remove <path>`).
+
+### Output Structure
+
+```
+inquiry/
+  <topic-slug>/
+    readme.md               <- tracks all iterations and overall findings
+    iteration_1/
+      README.md             <- hypotheses, method, findings, review log
+      report.html           <- auto-generated per-iteration report
+      <work files>          <- code, arguments, evidence analysis
+    iteration_2/
+      ...
+    report.html             <- multi-iteration summary report
+```
+
+### Reports
+
+Every iteration produces a self-contained HTML report with the full investigation record. When the investigation concludes, a summary report is auto-generated across all iterations.
+
+For on-demand reports at any point during or after an investigation, use `@deep-inquiry-reporter`.
+
+Reports use dark/light theme based on system preference, are printable to PDF, and require no server — just open the HTML file in a browser.
