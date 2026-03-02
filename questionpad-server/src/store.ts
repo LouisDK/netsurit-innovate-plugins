@@ -1,0 +1,152 @@
+import { v4 as uuidv4 } from 'uuid';
+import type { Card, Answer, Session, SessionStatus } from './types.js';
+
+interface CreateSessionInput {
+  agentId?: string;
+  title: string;
+  cards: Card[];
+}
+
+interface CloseSessionResult {
+  finalAnswers: Answer[];
+  globalComment?: string;
+  submittedAt?: string;
+}
+
+export class SessionStore {
+  private sessions = new Map<string, Session>();
+  private agents = new Map<string, Set<string>>();
+  private ttlMs: number;
+
+  constructor(ttlMinutes: number) {
+    this.ttlMs = ttlMinutes * 60 * 1000;
+  }
+
+  createSession(input: CreateSessionInput): { guid: string; agentId: string } {
+    const guid = uuidv4();
+    const agentId = input.agentId || uuidv4();
+
+    if (!this.agents.has(agentId)) {
+      this.agents.set(agentId, new Set());
+    }
+    this.agents.get(agentId)!.add(guid);
+
+    const now = Date.now();
+    this.sessions.set(guid, {
+      guid,
+      agentId,
+      title: input.title,
+      cards: input.cards,
+      answers: [],
+      status: 'created',
+      createdAt: now,
+      lastActivityAt: now,
+      cardVersion: 0,
+    });
+
+    return { guid, agentId };
+  }
+
+  getSession(agentId: string, guid: string): Session | null {
+    const session = this.sessions.get(guid);
+    if (!session || session.agentId !== agentId) return null;
+    this.touch(guid);
+    return session;
+  }
+
+  /** Browser-facing: no agentId check (browser knows the guid from the URL) */
+  getSessionPublic(guid: string): Session | null {
+    const session = this.sessions.get(guid);
+    if (!session) return null;
+    this.touch(guid);
+    return session;
+  }
+
+  submitAnswer(guid: string, answer: Answer): boolean {
+    const session = this.sessions.get(guid);
+    if (!session || session.status === 'closed' || session.status === 'expired') return false;
+
+    const existing = session.answers.findIndex(a => a.cardId === answer.cardId);
+    if (existing >= 0) {
+      session.answers[existing] = answer;
+    } else {
+      session.answers.push(answer);
+    }
+
+    if (session.status === 'created') {
+      session.status = 'in_progress';
+    }
+    this.touch(guid);
+    return true;
+  }
+
+  submitSession(guid: string, globalComment?: string): boolean {
+    const session = this.sessions.get(guid);
+    if (!session || session.status === 'closed' || session.status === 'expired') return false;
+
+    session.status = 'submitted';
+    session.submittedAt = new Date().toISOString();
+    session.globalComment = globalComment;
+    this.touch(guid);
+    return true;
+  }
+
+  updateCards(agentId: string, guid: string, cards: Card[]): boolean {
+    const session = this.sessions.get(guid);
+    if (!session || session.agentId !== agentId) return false;
+    if (session.status === 'closed' || session.status === 'expired') return false;
+
+    const newCardIds = new Set(cards.map(c => c.id));
+    session.answers = session.answers.filter(a => newCardIds.has(a.cardId));
+    session.cards = cards;
+    session.cardVersion++;
+    this.touch(guid);
+    return true;
+  }
+
+  closeSession(agentId: string, guid: string): CloseSessionResult | null {
+    const session = this.sessions.get(guid);
+    if (!session || session.agentId !== agentId) return null;
+
+    session.status = 'closed';
+    this.touch(guid);
+    return {
+      finalAnswers: session.answers,
+      globalComment: session.globalComment,
+      submittedAt: session.submittedAt,
+    };
+  }
+
+  getAllSessions(agentId: string): Session[] {
+    const guids = this.agents.get(agentId);
+    if (!guids) return [];
+    const result: Session[] = [];
+    for (const guid of guids) {
+      const session = this.sessions.get(guid);
+      if (session) {
+        this.touch(guid);
+        result.push(session);
+      }
+    }
+    return result;
+  }
+
+  purgeExpired(): void {
+    const now = Date.now();
+    for (const [guid, session] of this.sessions) {
+      if (now - session.lastActivityAt >= this.ttlMs) {
+        this.sessions.delete(guid);
+        const agentGuids = this.agents.get(session.agentId);
+        if (agentGuids) {
+          agentGuids.delete(guid);
+          if (agentGuids.size === 0) this.agents.delete(session.agentId);
+        }
+      }
+    }
+  }
+
+  private touch(guid: string): void {
+    const session = this.sessions.get(guid);
+    if (session) session.lastActivityAt = Date.now();
+  }
+}
