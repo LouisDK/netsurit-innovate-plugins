@@ -163,9 +163,58 @@ If you see a list of models, the MCP server is working.
 
 ---
 
+## Worktree Isolation
+
+Investigations are exploratory — they shouldn't permanently change your working tree. Deep
+Inquiry automatically offers to run in a git worktree when you're on the main tree.
+
+### How it works
+
+| You're in... | What happens |
+|---|---|
+| **Main tree** | Agent offers a worktree (recommends it for Code/Mixed mode) |
+| **An existing worktree** | Agent works in-place — you already have isolation |
+
+If you accept, the agent creates `.claude/worktrees/inquiry-<topic>` with a dedicated
+branch. All investigation artifacts (code experiments, profiling scripts, modified source
+files) stay isolated there.
+
+### What survives
+
+The **summary report** (`inquiry/<topic>/report.html`) is automatically copied to your
+main working tree when the investigation concludes. It is not git-added — you decide
+whether to commit it.
+
+### Inspecting and cleaning up
+
+After the investigation, the worktree remains available for inspection. You can browse
+the iteration files, review code changes, and check diffs.
+
+When you're done inspecting:
+
+```
+@deep-inquiry clean up the <topic> worktree
+```
+
+Or manually:
+
+```bash
+git worktree remove .claude/worktrees/inquiry-<topic>
+git branch -D inquiry/<topic>
+```
+
+### Resuming previous investigations
+
+If you start a new inquiry and a previous inquiry worktree exists, the agent will ask
+whether to continue the old investigation, start fresh (removing the old worktree), or
+keep both side by side.
+
+---
+
 ## Output Structure
 
-All investigation work is written to the current working directory:
+All investigation work is written to the working directory (either the main tree or an
+inquiry worktree, depending on your isolation choice):
 
 ```
 inquiry/
@@ -191,14 +240,10 @@ inquiry/<topic>/iteration_N/report.html
 Open it in any browser — no server needed. Shows the hypothesis arc, review log with tier
 breakdown, key findings, domain interpretation, and future directions.
 
-For a richer summary across all iterations, invoke the reporter agent:
-
-```
-@deep-inquiry-reporter
-```
-
-This reads all finished iteration data and produces `inquiry/<topic>/report.html` — a full
-arc view with iteration timeline, insight gallery, decision log, and lessons learned.
+A multi-iteration summary report is automatically generated when the investigation concludes.
+If a worktree was used, the report is copied to `inquiry/<topic>/report.html` in your main
+tree. The `@deep-inquiry-reporter` agent can also be invoked manually at any time for
+on-demand reports.
 
 Both report types share the same template and include a dark/light theme toggle. They are
 printable to PDF from the browser.
