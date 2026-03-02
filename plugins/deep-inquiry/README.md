@@ -43,7 +43,7 @@ These work with just LLM reasoning over training data, local files, and bash. No
 
 ### Tier 2: With Web Search MCP
 
-Web search changes the game: the agent can verify claims against current information, check pricing, and read live documentation. Claims are verified, not just reasoned about. This is the difference between "I think Kubernetes pricing works like this" and "here's what the current pricing page says."
+Adding web search is a meaningful step up: the agent can verify claims against current information, check pricing, and read live documentation. Claims are verified, not just reasoned about. This is the difference between "I think Kubernetes pricing works like this" and "here's what the current pricing page says."
 
 #### "Evaluate whether we should adopt Kubernetes or stay on ECS"
 
