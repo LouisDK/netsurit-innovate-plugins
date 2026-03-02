@@ -313,7 +313,9 @@ After finalising the iteration README, generate a self-contained HTML report:
 - Write `inquiry/<topic>/iteration_<N>/report.html` using the agent's report generation instructions
 - This report is shareable — it has no external dependencies and opens in any browser
 
-For a multi-iteration summary report spanning all iterations, invoke `@deep-inquiry-reporter`.
+When the investigation concludes (no more iterations), the agent will automatically generate
+a multi-iteration summary report. The `@deep-inquiry-reporter` agent can also be invoked
+manually at any time for on-demand reports.
 
 ### Iteration README Template
 
@@ -434,10 +436,10 @@ After completing an iteration:
    - Were there fundamental flaws requiring rethinking?
 
 3. **Decision paths**:
-   - ✅ **Done**: Question answered, stop
+   - ✅ **Done**: Question answered → generate summary report, stop
    - 🔄 **New iteration**: Try alternative approach (if budget allows)
-   - ⏸️ **Pause**: Partial results, document what was learned
-   - ❌ **Abandon**: Approach not working, document why
+   - ⏸️ **Pause**: Partial results, document what was learned → generate summary report, stop
+   - ❌ **Abandon**: Approach not working, document why → generate summary report, stop
 
 4. **If creating a new iteration**:
    - Increment iteration number

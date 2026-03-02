@@ -224,11 +224,106 @@ cd ${CLAUDE_PLUGIN_ROOT} && python3 -m http.server 18924 &
 
 Navigate to `http://localhost:18924/../../inquiry/<topic>/iteration_<N>/report.html`.
 
-Tell the user: *"Iteration report written to `inquiry/<topic>/iteration_<N>/report.html`. For a full multi-iteration summary, invoke `@deep-inquiry-reporter`."*
+Tell the user: *"Iteration report written to `inquiry/<topic>/iteration_<N>/report.html`."*
 
 Close browser after user acknowledges.
 
 **If Playwright is unavailable:** Skip opening; just tell the user the file path.
+
+---
+
+## Auto-Generating the Summary Report
+
+When the investigation concludes — Phase 6 decides **Done**, **Pause**, or **Abandon** with no
+further iterations — automatically generate the multi-iteration summary report. Do NOT wait
+for the user to request it.
+
+Follow the exact same workflow as the `deep-inquiry-reporter` agent:
+
+### Step 1: Read topic-level README
+
+Read `inquiry/<topic>/readme.md` to get the overall goal, status, and iteration list.
+
+### Step 2: Read all iteration READMEs
+
+Use Glob to find `inquiry/<topic>/iteration_*/README.md`. Read each and extract:
+- Iteration number, title, date, status
+- Goal and outcome
+- Hypotheses (text, how tested, outcome, status)
+- Key findings (heading, detail, evidence)
+- Review log (mode, models, tier items with actions)
+- Domain interpretation
+- Pivot reason (why moved to next iteration, or null if final)
+- Lessons learned and future directions
+
+### Step 3: Construct summary JSON
+
+Build the `type: "summary"` JSON:
+
+```json
+{
+  "type": "summary",
+  "meta": {
+    "topic": "<topic>",
+    "domain": "<from first iteration>",
+    "overallGoal": "<from topic readme>",
+    "status": "<from topic readme>",
+    "dateRange": {
+      "from": "<date of iteration 1>",
+      "to": "<date of last iteration>"
+    }
+  },
+  "conclusion": "<synthesised 1-3 sentence conclusion from all findings>",
+  "iterations": [
+    {
+      "number": 1,
+      "title": "<title>",
+      "goal": "<goal>",
+      "outcome": "<Success|Partial|Failed>",
+      "pivotReason": "<why moved to next iteration, or null if final>",
+      "status": "<Done|Abandoned>"
+    }
+  ],
+  "insights": [
+    {
+      "iteration": 1,
+      "heading": "<key finding heading>",
+      "detail": "<detail>",
+      "significance": "high|medium"
+    }
+  ],
+  "decisionLog": [
+    {
+      "afterIteration": 1,
+      "decision": "Pivot|Done|Pause|Abandon",
+      "reasoning": "<why>"
+    }
+  ],
+  "lessonsLearned": ["<aggregated across all iterations>"],
+  "futureDirections": ["<aggregated across all iterations>"]
+}
+```
+
+**Significance heuristic:** Mark insights as `high` if they directly answer the overall goal
+or caused a major pivot. Mark as `medium` otherwise.
+
+**Conclusion synthesis:** Write 1-3 sentences summarising what was found across all iterations.
+
+### Step 4: Write and open the report
+
+Read `${CLAUDE_PLUGIN_ROOT}/assets/report-template.html` as a string.
+
+Write `inquiry/<topic>/report.html`:
+- First line: `<script>window.REPORT_DATA = <JSON>;</script>`
+- Remaining lines: full contents of `report-template.html`
+
+Open in browser using the same method as iteration reports. If Playwright is unavailable,
+tell the user the file path.
+
+Tell the user:
+- Where the report was written (`inquiry/<topic>/report.html`)
+- How many iterations were summarised
+- The one-sentence conclusion
 
 ---
 
