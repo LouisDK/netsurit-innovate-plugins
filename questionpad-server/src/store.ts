@@ -158,7 +158,7 @@ export class SessionStore {
     if (!session || session.status === 'closed' || session.status === 'expired') return false;
 
     const respondent = session.respondents.find(r => r.respondentId === respondentId);
-    if (!respondent) return false;
+    if (!respondent || respondent.status === 'submitted') return false;
 
     respondent.status = 'submitted';
     respondent.submittedAt = new Date().toISOString();

@@ -291,6 +291,20 @@ describe('SessionStore', () => {
     expect(respondent.globalComment).toBe('Great form');
   });
 
+  it('rejects double submit on same respondent', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'A', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+    });
+    const guid = result.sessions[0].guid;
+    const join = store.joinSession(guid, 'Alice')!;
+    store.submitRespondent(guid, join.respondentId, 'First');
+    expect(store.submitRespondent(guid, join.respondentId, 'Second')).toBe(false);
+    // globalComment should remain the first
+    const session = store.getSessionPublic(guid)!;
+    expect(session.respondents[0].globalComment).toBe('First');
+  });
+
   it('rejects submitRespondent with unknown respondentId', () => {
     const result = store.createSession({
       title: 'T',
