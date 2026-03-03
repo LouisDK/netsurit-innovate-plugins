@@ -107,11 +107,21 @@ body {
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 16px;
-  transition: border-color 0.2s;
+  transition: background 0.3s, border-color 0.3s;
 }
 
 .card:hover {
   border-color: var(--card-hover);
+}
+
+.card.answered {
+  background: rgba(26, 127, 55, 0.12);
+  border-color: rgba(26, 127, 55, 0.3);
+}
+
+.card.skipped {
+  background: rgba(85, 85, 85, 0.12);
+  border-color: rgba(85, 85, 85, 0.3);
 }
 
 .card-header {
@@ -151,8 +161,9 @@ body {
 }
 
 .card-answer-summary {
-  color: var(--muted);
+  color: #8fc9a3;
   font-size: 0.85rem;
+  font-weight: 500;
   margin-left: auto;
   flex-shrink: 0;
   max-width: 250px;
@@ -890,8 +901,14 @@ body {
     if (!el) return;
     const dot = el.querySelector('.status-dot');
     dot.className = 'status-dot';
-    if (statuses[cardId] === 'answered') dot.classList.add('answered');
-    else if (statuses[cardId] === 'skipped') dot.classList.add('skipped');
+    el.classList.remove('answered', 'skipped');
+    if (statuses[cardId] === 'answered') {
+      dot.classList.add('answered');
+      el.classList.add('answered');
+    } else if (statuses[cardId] === 'skipped') {
+      dot.classList.add('skipped');
+      el.classList.add('skipped');
+    }
 
     const card = requestData.cards.find(c => c.id === cardId);
     const summaryEl = el.querySelector('.card-answer-summary');
@@ -1172,11 +1189,7 @@ body {
         delete answers[card.id];
         statuses[card.id] = 'unanswered';
         updateProgress();
-        const el = document.getElementById('card-' + card.id);
-        if (el) {
-          el.querySelector('.status-dot').className = 'status-dot';
-          el.querySelector('.card-answer-summary').textContent = '';
-        }
+        updateCardUI(card.id);
       }
     });
     container.appendChild(ta);
