@@ -665,6 +665,7 @@ body {
   let requestData = null;
   let answers = {};    // cardId -> answer object
   let comments = {};   // cardId -> comment string
+  let pendingAnswers = [];  // answers to restore after render (used during form updates)
   let statuses = {};   // cardId -> 'unanswered' | 'answered' | 'skipped'
   let submitted = false;
   var currentCardVersion = null;
@@ -715,8 +716,9 @@ body {
       return;
     }
     if (currentCardVersion !== null && data.cardVersion !== currentCardVersion) {
-      // Merge server answers into local state
       requestData.cards = data.cards;
+      // Stash server answers so render() can restore them
+      pendingAnswers = data.answers || [];
       render();
       showToast('Form updated by facilitator');
     }
@@ -1373,6 +1375,93 @@ body {
     updateFill();
   }
 
+  // --- Restore visual state of a card from a saved answer ---
+  function restoreCardVisual(cardEl, card, answer) {
+    if (answer == null) return;
+    switch (card.type) {
+      case 'multiple-choice': {
+        var choice = answer.choice;
+        if (!choice) break;
+        cardEl.querySelectorAll('.option-label input[type="radio"]').forEach(function(inp) {
+          if (inp.value === choice) {
+            inp.checked = true;
+            inp.closest('.option-label').classList.add('selected');
+          }
+        });
+        break;
+      }
+      case 'multi-select': {
+        var choices = answer.choices || [];
+        cardEl.querySelectorAll('.option-label input[type="checkbox"]').forEach(function(inp) {
+          if (choices.indexOf(inp.value) >= 0) {
+            inp.checked = true;
+            inp.closest('.option-label').classList.add('selected');
+          }
+        });
+        break;
+      }
+      case 'yes-no': {
+        var val = answer.value;
+        var toggle = cardEl.querySelector('.toggle-switch');
+        var labels = cardEl.querySelectorAll('.toggle-label');
+        if (toggle && labels.length === 2) {
+          toggle.classList.toggle('on', val);
+          labels[0].classList.toggle('active', !val); // No
+          labels[1].classList.toggle('active', val);  // Yes
+        }
+        break;
+      }
+      case 'approve-reject': {
+        var status = answer.status;
+        if (status === 'approved') {
+          var btn = cardEl.querySelector('.btn-approve');
+          if (btn) btn.classList.add('selected');
+        } else if (status === 'rejected') {
+          var btn = cardEl.querySelector('.btn-reject');
+          if (btn) btn.classList.add('selected');
+        }
+        break;
+      }
+      case 'free-text': {
+        var text = answer.text || '';
+        var ta = cardEl.querySelector('.free-text-area');
+        if (ta) ta.value = text;
+        break;
+      }
+      case 'rating': {
+        var rating = answer.rating;
+        cardEl.querySelectorAll('.rating-btn').forEach(function(btn) {
+          if (parseInt(btn.dataset.val) === rating) {
+            btn.classList.add('selected');
+          }
+        });
+        break;
+      }
+      case 'slider': {
+        var v = answer.value;
+        var range = cardEl.querySelector('input[type="range"]');
+        var numInp = cardEl.querySelector('.slider-value-input');
+        if (range) range.value = v;
+        if (numInp) numInp.value = v;
+        break;
+      }
+      case 'range-slider': {
+        var vals = answer.value || [];
+        var ranges = cardEl.querySelectorAll('input[type="range"]');
+        var numInputs = cardEl.querySelectorAll('.slider-input');
+        if (ranges.length >= 2 && vals.length >= 2) {
+          ranges[0].value = vals[0];
+          ranges[1].value = vals[1];
+          if (numInputs.length >= 2) {
+            numInputs[0].value = vals[0];
+            numInputs[1].value = vals[1];
+          }
+        }
+        break;
+      }
+    }
+  }
+
   // --- Render app ---
   function render() {
     if (!requestData || !requestData.cards) return;
@@ -1384,19 +1473,50 @@ body {
     const container = document.getElementById('cards-container');
     container.innerHTML = '';
 
-    // Reset state
+    // Reset state, but restore any pending answers from server
+    var savedAnswers = {};
+    var savedComments = {};
+    if (pendingAnswers.length > 0) {
+      pendingAnswers.forEach(function(a) {
+        savedAnswers[a.cardId] = a.value;
+        if (a.comment) savedComments[a.cardId] = a.comment;
+      });
+      pendingAnswers = [];
+    }
+
     answers = {};
     comments = {};
     statuses = {};
     submitted = false;
 
     requestData.cards.forEach(function(card) {
-      statuses[card.id] = 'unanswered';
-      comments[card.id] = '';
+      // Restore saved answer if it exists for this card
+      if (savedAnswers[card.id] !== undefined) {
+        answers[card.id] = savedAnswers[card.id];
+        comments[card.id] = savedComments[card.id] || '';
+        statuses[card.id] = 'answered';
+      } else {
+        statuses[card.id] = 'unanswered';
+        comments[card.id] = '';
+      }
     });
 
     requestData.cards.forEach(function(card) {
-      container.appendChild(buildCard(card));
+      var cardEl = buildCard(card);
+      container.appendChild(cardEl);
+      // Restore visual state if answer was preserved from server
+      if (answers[card.id] !== undefined) {
+        restoreCardVisual(cardEl, card, answers[card.id]);
+        updateCardUI(card.id);
+      }
+      // Restore comment text if present
+      if (comments[card.id]) {
+        var commentTa = cardEl.querySelector('.comment-area textarea');
+        if (commentTa) {
+          commentTa.value = comments[card.id];
+          commentTa.closest('.comment-area').classList.add('open');
+        }
+      }
     });
 
     // Submit handler
