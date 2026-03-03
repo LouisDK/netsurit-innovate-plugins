@@ -61,6 +61,7 @@ app.get('/api/sessions/:guid', (req, res) => {
   res.json({
     label: session.label,
     title: session.title,
+    description: session.description,
     cards: session.cards,
     answers: session.answers,
     status: session.status,

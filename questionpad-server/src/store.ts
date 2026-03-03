@@ -9,6 +9,7 @@ interface Participant {
 interface CreateSessionInput {
   agentId?: string;
   title: string;
+  description?: string;
   participants: Participant[];
 }
 
@@ -54,6 +55,7 @@ export class SessionStore {
         agentId,
         label: participant.label,
         title: input.title,
+        description: input.description,
         cards: participant.cards,
         answers: [],
         status: 'created',

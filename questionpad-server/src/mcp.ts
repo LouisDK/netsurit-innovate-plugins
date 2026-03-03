@@ -25,7 +25,7 @@ const CardSchema = z.object({
     '- range-slider: requires "min" and "max", optional "step". Answer: { value: [3, 8] }'
   ),
   title: z.string().describe('The question or prompt shown to the participant.'),
-  body: z.string().optional().describe('Optional longer description shown below the title.'),
+  body: z.string().optional().describe('Optional markdown text shown below the card title. Use for context, instructions, or details specific to this question.'),
   required: z.boolean().optional().describe('If true, the participant must answer this card before submitting. Defaults to false.'),
   options: z.array(z.string()).optional().describe('Answer choices. Required for multiple-choice and multi-select card types.'),
   min: z.number().optional().describe('Minimum value. Required for rating, slider, and range-slider card types.'),
@@ -77,6 +77,11 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
           'Pass the same agentId to subsequent create_session calls to group sessions under the same agent.'
         ),
         title: z.string().describe('Session title shown at the top of the form (e.g. "Sprint Retrospective", "Design Review").'),
+        description: z.string().optional().describe(
+          'Optional markdown text displayed below the title, above the question cards. ' +
+          'Use this to provide context, instructions, or background information to participants. ' +
+          'Supports full markdown: headings, bold, italic, lists, code blocks, and links.'
+        ),
         participants: z.array(ParticipantSchema).min(1).describe('One or more participants, each with their own label and question cards.'),
       },
     },
@@ -84,6 +89,7 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
       const result = store.createSession({
         agentId: args.agentId,
         title: args.title,
+        description: args.description,
         participants: args.participants,
       });
       const sessions = result.sessions.map(s => ({

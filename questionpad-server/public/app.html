@@ -95,6 +95,21 @@ body {
   padding-bottom: 180px;
 }
 
+.session-description {
+  max-width: 800px;
+  margin: 0 auto 20px;
+  display: none;
+}
+.session-description:not(:empty) { display: block; }
+.session-description .md-block {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
 .cards {
   max-width: 800px;
   margin: 0 auto;
@@ -767,6 +782,7 @@ body {
     </div>
   </div>
   <div class="main">
+    <div class="session-description" id="session-description"></div>
     <div class="cards" id="cards-container"></div>
   </div>
   <div class="footer">
@@ -882,7 +898,7 @@ body {
 
     var sessionState = {
       guid: guid,
-      requestData: { title: data.title, cards: data.cards, label: data.label },
+      requestData: { title: data.title, description: data.description, cards: data.cards, label: data.label },
       answers: {},
       comments: {},
       statuses: {},
@@ -1010,7 +1026,7 @@ body {
       }
       if (data.cardVersion !== s.currentCardVersion) {
         s.currentCardVersion = data.cardVersion;
-        s.requestData = { title: data.title, cards: data.cards, label: data.label };
+        s.requestData = { title: data.title, description: data.description, cards: data.cards, label: data.label };
         if (guid === activeGuid) {
           // Re-render active form with pending answers from server
           pendingAnswers = data.answers || [];
@@ -1988,6 +2004,17 @@ body {
     document.getElementById('app-waiting').style.display = 'none';
     document.getElementById('app-root').style.display = '';
     document.getElementById('req-title').textContent = requestData.title || 'Feedback Request';
+
+    var descEl = document.getElementById('session-description');
+    if (requestData.description) {
+      var mdBlock = document.createElement('div');
+      mdBlock.className = 'md-block';
+      mdBlock.innerHTML = renderMarkdown(requestData.description);
+      descEl.innerHTML = '';
+      descEl.appendChild(mdBlock);
+    } else {
+      descEl.innerHTML = '';
+    }
 
     const container = document.getElementById('cards-container');
     container.innerHTML = '';

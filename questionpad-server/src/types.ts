@@ -34,6 +34,7 @@ export interface Session {
   agentId: string;
   label: string;
   title: string;
+  description?: string;
   cards: Card[];
   answers: Answer[];
   status: SessionStatus;
