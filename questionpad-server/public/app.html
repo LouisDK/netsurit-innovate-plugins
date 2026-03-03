@@ -760,11 +760,64 @@ body {
   max-width: 800px;
   margin: 4px auto 0;
 }
+
+/* Join screen */
+.join-screen {
+  max-width: 500px;
+  margin: 80px auto;
+  padding: 0 20px;
+  text-align: center;
+}
+.join-screen h1 {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+}
+.join-screen .session-description {
+  text-align: left;
+  margin-bottom: 24px;
+}
+.join-form {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 24px;
+}
+.join-form label {
+  display: block;
+  color: var(--muted);
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+.join-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+.join-form input:focus {
+  outline: none;
+  border-color: var(--progress);
+}
 </style>
 </head>
 <body>
 
 <div id="app-waiting" class="waiting">Loading...</div>
+<div id="app-join" style="display:none;">
+  <div class="join-screen">
+    <h1 id="join-title"></h1>
+    <div id="join-description" class="session-description"></div>
+    <div class="join-form">
+      <label for="join-name">Enter your name to join</label>
+      <input type="text" id="join-name" placeholder="Your name..." autofocus>
+      <button id="join-btn" class="btn-submit">Join</button>
+    </div>
+  </div>
+</div>
 <div id="app-root" style="display:none;">
   <div class="header">
     <div class="header-top">
@@ -812,6 +865,7 @@ body {
   let statuses = {};
   let submitted = false;
   var currentCardVersion = null;
+  var currentRespondentId = null;
 
   // Detect entry point
   var pathGuid = null;
@@ -827,10 +881,12 @@ body {
 
   // --- Send individual answer to server ---
   function sendAnswer(guid, cardId, value, comment) {
+    var session = hubSessions[guid];
+    var respondentId = session ? session.respondentId : currentRespondentId;
     fetch('/api/sessions/' + guid + '/answers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cardId: cardId, value: value, comment: comment || '' }),
+      body: JSON.stringify({ respondentId: respondentId, cardId: cardId, value: value, comment: comment || '' }),
     });
   }
 
@@ -865,6 +921,32 @@ body {
     catch(e) { return []; }
   }
 
+  function saveRespondent(guid, respondentId, name) {
+    try {
+      localStorage.setItem('questionpad-respondent-' + guid, JSON.stringify({ respondentId: respondentId, name: name }));
+    } catch(e) {}
+  }
+
+  function loadRespondent(guid) {
+    try {
+      return JSON.parse(localStorage.getItem('questionpad-respondent-' + guid) || 'null');
+    } catch(e) { return null; }
+  }
+
+  function clearRespondent(guid) {
+    try { localStorage.removeItem('questionpad-respondent-' + guid); } catch(e) {}
+  }
+
+  async function joinSessionApi(guid, name) {
+    var res = await fetch('/api/sessions/' + guid + '/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  }
+
   function removeSession(guid) {
     if (hubSessions[guid]) {
       if (hubSessions[guid].pollInterval) clearInterval(hubSessions[guid].pollInterval);
@@ -885,10 +967,73 @@ body {
     }
   }
 
-  async function addSession(guid) {
+  function showJoinScreen(guid) {
+    fetchSessionData(guid).then(function(data) {
+      if (!data) {
+        showToast('Session not found');
+        return;
+      }
+      if (data.status === 'closed' || data.status === 'expired') {
+        showSessionEnded();
+        return;
+      }
+
+      document.getElementById('app-waiting').style.display = 'none';
+      document.getElementById('app-root').style.display = 'none';
+      document.getElementById('app-join').style.display = '';
+      document.getElementById('join-title').textContent = data.title || 'Feedback Request';
+
+      var descEl = document.getElementById('join-description');
+      if (data.description) {
+        var mdBlock = document.createElement('div');
+        mdBlock.className = 'md-block';
+        mdBlock.innerHTML = renderMarkdown(data.description);
+        descEl.innerHTML = '';
+        descEl.appendChild(mdBlock);
+        descEl.style.display = '';
+      } else {
+        descEl.innerHTML = '';
+        descEl.style.display = 'none';
+      }
+
+      var joinBtn = document.getElementById('join-btn');
+      var nameInput = document.getElementById('join-name');
+      nameInput.value = '';
+      nameInput.focus();
+
+      var handler = async function() {
+        var name = nameInput.value.trim();
+        if (!name) return;
+        var result = await joinSessionApi(guid, name);
+        if (!result) {
+          showToast('Could not join session');
+          return;
+        }
+        currentRespondentId = result.respondentId;
+        saveRespondent(guid, result.respondentId, name);
+        document.getElementById('app-join').style.display = 'none';
+        document.getElementById('app-root').style.display = '';
+        addSessionAfterJoin(guid, result);
+      };
+
+      // Remove old handlers
+      var newBtn = joinBtn.cloneNode(true);
+      joinBtn.parentNode.replaceChild(newBtn, joinBtn);
+      newBtn.addEventListener('click', handler);
+
+      var newInput = nameInput.cloneNode(true);
+      nameInput.parentNode.replaceChild(newInput, nameInput);
+      newInput.focus();
+      newInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') newBtn.click();
+      });
+    });
+  }
+
+  async function addSessionAfterJoin(guid, joinResult) {
     if (hubSessions[guid]) {
-      showToast('Session already added');
-      return false;
+      switchTab(guid);
+      return true;
     }
     var data = await fetchSessionData(guid);
     if (!data) {
@@ -899,18 +1044,19 @@ body {
     var sessionState = {
       guid: guid,
       requestData: { title: data.title, description: data.description, cards: data.cards, label: data.label },
+      respondentId: joinResult.respondentId,
       answers: {},
       comments: {},
       statuses: {},
-      submitted: data.status === 'submitted' || data.status === 'closed',
+      submitted: false,
       currentCardVersion: data.cardVersion,
       activeCardId: null,
       hasUpdate: false,
       pollInterval: null,
     };
 
-    // Restore answers from server
-    (data.answers || []).forEach(function(a) {
+    // Restore answers from join result
+    (joinResult.answers || []).forEach(function(a) {
       sessionState.answers[a.cardId] = a.value;
       if (a.comment) sessionState.comments[a.cardId] = a.comment;
       sessionState.statuses[a.cardId] = 'answered';
@@ -929,6 +1075,29 @@ body {
     startPolling(guid);
     switchTab(guid);
     return true;
+  }
+
+  async function addSession(guid) {
+    if (hubSessions[guid]) {
+      showToast('Session already added');
+      return false;
+    }
+
+    // Check for saved respondent in localStorage
+    var saved = loadRespondent(guid);
+    if (saved) {
+      var result = await joinSessionApi(guid, saved.name);
+      if (result) {
+        currentRespondentId = result.respondentId;
+        return addSessionAfterJoin(guid, result);
+      }
+      // Saved respondent invalid — clear and show join screen
+      clearRespondent(guid);
+    }
+
+    // No saved respondent — show join screen
+    showJoinScreen(guid);
+    return false;
   }
 
   function switchTab(guid) {
@@ -952,6 +1121,7 @@ body {
     submitted = s.submitted;
     activeCardId = null;
     currentCardVersion = s.currentCardVersion;
+    currentRespondentId = s.respondentId;
 
     // Populate pendingAnswers so render() rebuilds from session state
     pendingAnswers = Object.keys(answers).map(function(cardId) {
@@ -973,8 +1143,12 @@ body {
 
     // Show participant label
     var labelEl = document.getElementById('participant-label');
-    if (s.requestData.label) {
-      labelEl.textContent = 'Participant: ' + s.requestData.label;
+    var saved = loadRespondent(guid);
+    var displayParts = [];
+    if (s.requestData.label) displayParts.push(s.requestData.label);
+    if (saved && saved.name) displayParts.push(saved.name);
+    if (displayParts.length > 0) {
+      labelEl.textContent = displayParts.join(' \u2014 ');
       labelEl.style.display = '';
     } else {
       labelEl.style.display = 'none';
@@ -1028,8 +1202,14 @@ body {
         s.currentCardVersion = data.cardVersion;
         s.requestData = { title: data.title, description: data.description, cards: data.cards, label: data.label };
         if (guid === activeGuid) {
-          // Re-render active form with pending answers from server
-          pendingAnswers = data.answers || [];
+          // Re-join to get fresh respondent answers
+          var savedResp = loadRespondent(guid);
+          var freshAnswers = [];
+          if (savedResp) {
+            var joinResult = await joinSessionApi(guid, savedResp.name);
+            if (joinResult) freshAnswers = joinResult.answers || [];
+          }
+          pendingAnswers = freshAnswers;
           currentCardVersion = data.cardVersion;
           requestData = s.requestData;
           render();
@@ -2111,7 +2291,10 @@ body {
     await fetch('/api/sessions/' + activeGuid + '/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ globalComment: document.getElementById('global-comment').value || '' }),
+      body: JSON.stringify({
+        respondentId: hubSessions[activeGuid].respondentId,
+        globalComment: document.getElementById('global-comment').value || '',
+      }),
     });
 
     applySubmittedVisual();
@@ -2152,23 +2335,32 @@ body {
   // --- Init ---
   async function init() {
     var savedGuids = loadGuids();
-    if (pathGuid && savedGuids.indexOf(pathGuid) < 0) {
-      savedGuids.unshift(pathGuid);
-    }
 
-    document.getElementById('app-waiting').style.display = 'none';
-    document.getElementById('app-root').style.display = '';
-
-    if (savedGuids.length === 0) {
-      document.getElementById('req-title').textContent = 'QuestionPad Hub';
-      return;
-    }
-
+    // Restore sessions that have saved respondents
     for (var i = 0; i < savedGuids.length; i++) {
-      await addSession(savedGuids[i]);
+      var guid = savedGuids[i];
+      if (guid === pathGuid) continue; // Handle pathGuid separately below
+      var saved = loadRespondent(guid);
+      if (saved) {
+        var result = await joinSessionApi(guid, saved.name);
+        if (result) {
+          currentRespondentId = result.respondentId;
+          await addSessionAfterJoin(guid, result);
+        } else {
+          clearRespondent(guid);
+        }
+      }
     }
 
-    if (Object.keys(hubSessions).length === 0) {
+    // Handle pathGuid (URL entry point)
+    if (pathGuid) {
+      await addSession(pathGuid);
+    }
+
+    // If no sessions loaded, show hub
+    if (Object.keys(hubSessions).length === 0 && !pathGuid) {
+      document.getElementById('app-waiting').style.display = 'none';
+      document.getElementById('app-root').style.display = '';
       document.getElementById('req-title').textContent = 'QuestionPad Hub';
     }
   }
