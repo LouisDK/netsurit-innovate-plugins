@@ -246,6 +246,35 @@ BASE_URL=https://questionpad.example.com npm start
 
 Set `BASE_URL` to your public URL so that session URLs returned to agents point to the right place.
 
+### Azure Container Apps
+
+Prerequisites: [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) and [Docker](https://docs.docker.com/get-docker/) installed, logged in with `az login`.
+
+```bash
+# First time: deploy infrastructure (ACR, Container Apps Environment, Container App)
+./infra/deploy.sh infra
+
+# Build Docker image and push to ACR
+./infra/deploy.sh build
+
+# Deploy new image to Container App
+./infra/deploy.sh deploy
+
+# Or run all steps at once
+./infra/deploy.sh all
+
+# Check status
+./infra/deploy.sh status
+```
+
+Override defaults with environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `RESOURCE_GROUP` | `rg_inx_workshops_tools` | Azure resource group |
+| `LOCATION` | `eastus2` | Azure region |
+| `BASE_NAME` | `questionpad` | Base name for all resources |
+
 ## Development
 
 ```bash
