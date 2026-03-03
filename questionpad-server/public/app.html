@@ -1207,7 +1207,12 @@ body {
           var freshAnswers = [];
           if (savedResp) {
             var joinResult = await joinSessionApi(guid, savedResp.name);
-            if (joinResult) freshAnswers = joinResult.answers || [];
+            if (joinResult) {
+              freshAnswers = joinResult.answers || [];
+              s.respondentId = joinResult.respondentId;
+              currentRespondentId = joinResult.respondentId;
+              saveRespondent(guid, joinResult.respondentId, savedResp.name);
+            }
           }
           pendingAnswers = freshAnswers;
           currentCardVersion = data.cardVersion;
@@ -2344,7 +2349,6 @@ body {
       if (saved) {
         var result = await joinSessionApi(guid, saved.name);
         if (result) {
-          currentRespondentId = result.respondentId;
           await addSessionAfterJoin(guid, result);
         } else {
           clearRespondent(guid);
