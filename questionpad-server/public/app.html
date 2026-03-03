@@ -576,6 +576,14 @@ body {
 
 .btn-submit:hover:not(:disabled) { background: var(--submit-hover); }
 .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-submit.submitted-btn { background: var(--green); opacity: 0.6; }
+
+/* Submitted session grayed out */
+.cards.submitted-cards {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.footer.submitted-footer .global-comment { opacity: 0.5; }
 
 /* Waiting */
 .waiting {
@@ -764,7 +772,7 @@ body {
   <div class="footer">
     <div class="footer-inner">
       <textarea class="global-comment" id="global-comment" placeholder="Overall feedback (optional)..." rows="2"></textarea>
-      <button class="btn-submit" id="btn-submit" disabled>Submit All Feedback</button>
+      <button class="btn-submit" id="btn-submit" disabled>Submit Feedback</button>
     </div>
   </div>
 </div>
@@ -940,6 +948,12 @@ body {
 
     submitted = savedSubmitted;
     if (hubSessions[activeGuid]) hubSessions[activeGuid].submitted = submitted;
+
+    if (submitted) {
+      applySubmittedVisual();
+    } else {
+      removeSubmittedVisual();
+    }
 
     // Show participant label
     var labelEl = document.getElementById('participant-label');
@@ -2040,6 +2054,28 @@ body {
     }
   }
 
+  function applySubmittedVisual() {
+    var cardsContainer = document.getElementById('cards-container');
+    cardsContainer.classList.add('submitted-cards');
+    var footer = document.querySelector('.footer');
+    if (footer) footer.classList.add('submitted-footer');
+    var btn = document.getElementById('btn-submit');
+    btn.disabled = true;
+    btn.textContent = 'Submitted';
+    btn.classList.add('submitted-btn');
+  }
+
+  function removeSubmittedVisual() {
+    var cardsContainer = document.getElementById('cards-container');
+    cardsContainer.classList.remove('submitted-cards');
+    var footer = document.querySelector('.footer');
+    if (footer) footer.classList.remove('submitted-footer');
+    var btn = document.getElementById('btn-submit');
+    btn.disabled = false;
+    btn.textContent = 'Submit Feedback';
+    btn.classList.remove('submitted-btn');
+  }
+
   // --- Submit ---
   async function doSubmit() {
     submitted = true;
@@ -2051,20 +2087,9 @@ body {
       body: JSON.stringify({ globalComment: document.getElementById('global-comment').value || '' }),
     });
 
-    // Disable all controls
-    document.querySelectorAll('input, textarea, button, select').forEach(function(el) {
-      el.disabled = true;
-    });
-    document.querySelectorAll('.toggle-switch, .option-label, .skip-link, .comment-toggle').forEach(function(el) {
-      el.style.pointerEvents = 'none';
-    });
+    applySubmittedVisual();
 
-    // Show overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'submitted-overlay';
-    overlay.innerHTML = '<div class="submitted-banner"><h2>Submitted!</h2><p>Your feedback has been recorded.</p></div>';
-    document.body.appendChild(overlay);
-
+    showToast('Feedback submitted!');
     updateProgress();
   }
 
