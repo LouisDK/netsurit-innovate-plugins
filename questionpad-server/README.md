@@ -164,11 +164,12 @@ Poll for respondent answers.
 | `agentId` | string | Yes | Your agent identifier. |
 | `guids` | string[] | No | Filter to specific sessions. Omit for all. |
 
-**Session status:** `created` → `in_progress` → `closed`
+**Session status:** `created` → `in_progress` → `closed` / `expired`
 
 - `created` — no one has joined yet
 - `in_progress` — at least one person has joined
 - `closed` — agent closed the session
+- `expired` — session timed out due to inactivity (see `TTL_MINUTES` config)
 
 **Respondent status:** `in_progress` → `submitted`
 

@@ -68,12 +68,13 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
     {
       title: 'Create Session',
       description:
-        'Create a feedback session with one or more participants. Each participant gets their own URL ' +
-        'with a personalized set of question cards.\n\n' +
+        'Create a feedback session with one or more participant groups. Each group gets its own URL ' +
+        'with a set of question cards. Multiple people can open the same URL, enter their name, and fill in the form independently.\n\n' +
         'Returns an agentId (save this — you need it for all other calls) and a list of sessions, ' +
-        'each with a label, guid, and URL to share with the participant.\n\n' +
-        'Example: To ask Alice to rate a feature and ask Bob a yes/no question, create one session ' +
-        'with two participants, each having their own cards.',
+        'each with a label, guid, and URL to share.\n\n' +
+        'Example: To collect feedback from a sales team and an engineering team, create one session ' +
+        'with two participants — label "Sales" with sales-focused cards, label "Engineering" with technical cards. ' +
+        'Share each URL with the respective group.',
       inputSchema: {
         agentId: z.string().optional().describe(
           'Your agent identifier. Omit on first call — one will be generated and returned. ' +
@@ -148,7 +149,7 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
       description:
         'Replace the question cards on a session that hasn\'t been closed yet. ' +
         'Use this to add follow-up questions, correct mistakes, or adapt cards based on earlier answers from other participants.\n\n' +
-        'The participant\'s browser will automatically pick up the new cards within a few seconds. ' +
+        'All respondents\' browsers will automatically pick up the new cards within a few seconds. ' +
         'Any previously submitted answers for removed cards are discarded from all respondents.',
       inputSchema: {
         agentId: z.string().describe('Your agent identifier (returned by create_session).'),
