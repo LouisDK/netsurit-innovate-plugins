@@ -104,13 +104,13 @@ deploy_app() {
     log_info "Deploying tag: $GIT_COMMIT"
 
     az containerapp update \
-        --name "${BASE_NAME}-app" \
+        --name "${BASE_NAME}" \
         --resource-group "$RESOURCE_GROUP" \
         --image "$ACR_LOGIN_SERVER/questionpad:$GIT_COMMIT" \
         --revision-suffix "v${GIT_COMMIT}" \
         --output table
 
-    APP_URL=$(az containerapp show --name "${BASE_NAME}-app" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv 2>/dev/null || echo "Not deployed")
+    APP_URL=$(az containerapp show --name "${BASE_NAME}" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv 2>/dev/null || echo "Not deployed")
 
     echo ""
     log_info "Deployed!"
@@ -122,10 +122,10 @@ deploy_app() {
 show_status() {
     log_info "Deployment status..."
     echo ""
-    az containerapp show --name "${BASE_NAME}-app" --resource-group "$RESOURCE_GROUP" --output table 2>/dev/null || log_warn "Container App not found"
+    az containerapp show --name "${BASE_NAME}" --resource-group "$RESOURCE_GROUP" --output table 2>/dev/null || log_warn "Container App not found"
     echo ""
 
-    APP_URL=$(az containerapp show --name "${BASE_NAME}-app" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv 2>/dev/null || echo "Not deployed")
+    APP_URL=$(az containerapp show --name "${BASE_NAME}" --resource-group "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv 2>/dev/null || echo "Not deployed")
 
     echo "URL:"
     echo "  App: https://$APP_URL"
