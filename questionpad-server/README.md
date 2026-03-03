@@ -4,7 +4,19 @@ An MCP server that lets AI agents collect structured feedback from humans via in
 
 Multiple people can open the same session URL, enter their name, and fill in the form independently. The agent sees all individual responses grouped by session.
 
-## Quick Start
+## Hosted Instance
+
+A public instance is available — no setup required. Just point your AI agent's MCP configuration to:
+
+```
+https://questionpad.ashybush-f47448bd.eastus2.azurecontainerapps.io/mcp
+```
+
+This works with any MCP client that supports Streamable HTTP transport (Claude Desktop, Claude Code, Cursor, etc.). Add it as a custom MCP server / connector in your agent's settings.
+
+> **Note:** This instance runs on Azure Container Apps and scales to zero when idle. The first request after a period of inactivity takes about 1 minute to wake up. Subsequent requests are fast.
+
+## Quick Start (Local)
 
 ```bash
 npm install
@@ -29,11 +41,13 @@ Add to your MCP config (`claude_desktop_config.json` or `.mcp.json`):
   "mcpServers": {
     "questionpad": {
       "type": "streamable-http",
-      "url": "http://localhost:3000/mcp"
+      "url": "https://questionpad.ashybush-f47448bd.eastus2.azurecontainerapps.io/mcp"
     }
   }
 }
 ```
+
+For a local instance, replace the URL with `http://localhost:3000/mcp`.
 
 ### Generic MCP Client (TypeScript)
 
