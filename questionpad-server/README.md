@@ -2,6 +2,8 @@
 
 An MCP server that lets AI agents collect structured feedback from humans via interactive web forms. Agents create sessions with question cards (ratings, yes/no, multiple choice, free text, etc.), share URLs with participants, and poll for answers — all through standard MCP tool calls over HTTP.
 
+Multiple people can open the same session URL, enter their name, and fill in the form independently. The agent sees all individual responses grouped by session.
+
 ## Quick Start
 
 ```bash
@@ -47,21 +49,22 @@ await client.connect(
 // List available tools
 const { tools } = await client.listTools();
 
-// Create a session
+// Create sessions — one URL per label, multiple people can open the same URL
 const result = await client.callTool({
   name: 'create_session',
   arguments: {
     title: 'Sprint Retrospective',
+    description: 'Please rate the sprint and share your thoughts.',
     participants: [
       {
-        label: 'Alice',
+        label: 'Sales Team',
         cards: [
           { id: 'q1', type: 'rating', title: 'How was the sprint?', min: 1, max: 5 },
           { id: 'q2', type: 'free-text', title: 'What could we improve?' },
         ],
       },
       {
-        label: 'Bob',
+        label: 'Engineering',
         cards: [
           { id: 'q1', type: 'yes-no', title: 'Should we keep daily standups?' },
         ],
@@ -70,6 +73,17 @@ const result = await client.callTool({
   },
 });
 // Returns: { agentId: "...", sessions: [{ label, guid, url }, ...] }
+
+// Poll for answers — each session has respondents[]
+const sessions = await client.callTool({
+  name: 'get_sessions',
+  arguments: { agentId: '...' },
+});
+// Each session contains:
+// { guid, label, status, cards, respondents: [
+//     { name: "Alice", status: "submitted", answers: [...], globalComment: "..." },
+//     { name: "Bob", status: "in_progress", answers: [...] }
+// ]}
 ```
 
 ### Any HTTP Client
@@ -100,26 +114,31 @@ curl http://localhost:3000/mcp \
 ## Workflow
 
 ```
-Agent                          Server                         Human
+Agent                          Server                         Humans
   │                              │                              │
   ├─ create_session ────────────►│                              │
   │◄─ { agentId, urls[] } ──────┤                              │
   │                              │                              │
   │  (share URLs with humans)    │                              │
   │                              │◄──── opens /session/:guid ───┤
-  │                              │◄──── submits answers ────────┤
+  │                              │◄──── enters name ("Alice") ──┤
+  │                              │◄──── fills in & submits ─────┤
+  │                              │                              │
+  │                              │◄──── opens same URL ─────────┤ (another person)
+  │                              │◄──── enters name ("Bob") ────┤
+  │                              │◄──── fills in & submits ─────┤
   │                              │                              │
   ├─ get_sessions ──────────────►│                              │
-  │◄─ { status, answers[] } ────┤                              │
+  │◄─ { respondents[] } ────────┤                              │
   │                              │                              │
   ├─ close_sessions ────────────►│                              │
-  │◄─ { finalAnswers[] } ───────┤         (form locked)        │
+  │◄─ { respondents[] } ────────┤         (forms locked)       │
 ```
 
-1. **create_session** — create question cards for one or more participants. Each gets a unique URL.
-2. **get_sessions** — poll for answers. Check `status` field: `"submitted"` means the participant is done.
-3. **update_session** — optionally replace cards mid-session (e.g. follow-up questions).
-4. **close_sessions** — lock sessions and retrieve final answers.
+1. **create_session** — create question cards for one or more participant groups (labels). Each label gets a unique URL that multiple people can open.
+2. **get_sessions** — poll for answers. Each session contains `respondents[]` — check each respondent's `status` field (`"submitted"` means they're done).
+3. **update_session** — optionally replace cards mid-session (e.g. follow-up questions). Affects all respondents.
+4. **close_sessions** — lock sessions and retrieve all respondents' final answers.
 
 The `agentId` returned by `create_session` is your ownership token. Save it and pass it to all subsequent calls. It isolates your sessions from other agents on the same server.
 
@@ -127,43 +146,54 @@ The `agentId` returned by `create_session` is your ownership token. Save it and 
 
 ### create_session
 
-Create a feedback session with one or more participants.
+Create a feedback session with one or more participant groups.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `agentId` | string | No | Omit on first call (auto-generated). Reuse across calls. |
 | `title` | string | Yes | Form title shown to participants. |
-| `participants` | array | Yes | One or more `{ label, cards }` objects. |
+| `description` | string | No | Context shown above the cards. Supports markdown (tables, lists, bold, etc.). |
+| `participants` | array | Yes | One or more `{ label, cards }` objects. The `label` is flexible — a role, a team name, a person, or any grouping. Multiple people can open the same session URL. |
 
 ### get_sessions
 
-Poll for participant answers.
+Poll for respondent answers.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `agentId` | string | Yes | Your agent identifier. |
 | `guids` | string[] | No | Filter to specific sessions. Omit for all. |
 
-**Status lifecycle:** `created` → `in_progress` → `submitted` → `closed`
+**Session status:** `created` → `in_progress` → `closed`
+
+- `created` — no one has joined yet
+- `in_progress` — at least one person has joined
+- `closed` — agent closed the session
+
+**Respondent status:** `in_progress` → `submitted`
+
+Each respondent within a session has their own status. Check `respondent.status === "submitted"` to know when someone has finished.
 
 ### update_session
 
-Replace question cards on a session that hasn't been submitted yet.
+Replace question cards on an open session.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `agentId` | string | Yes | Your agent identifier. |
 | `guid` | string | Yes | Session to update. |
-| `cards` | array | Yes | New card set (replaces all existing cards). |
+| `cards` | array | Yes | New card set (replaces all existing cards). Affects all respondents. |
 
 ### close_sessions
 
-Close sessions and retrieve final answers.
+Close sessions and retrieve all respondents' final answers.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `agentId` | string | Yes | Your agent identifier. |
 | `guids` | string[] | No | Sessions to close. Omit to close all. |
+
+Returns an array of sessions, each with `respondents[]` containing each person's `name`, `answers`, `globalComment`, and `submittedAt`.
 
 ## Card Types
 
@@ -178,13 +208,15 @@ Close sessions and retrieve final answers.
 | `multi-select` | `options` | `{ choices: ["A", "B"] }` |
 | `free-text` | optional `placeholder` | `{ text: "..." }` |
 
-All card types accept optional `body` (description below title) and `required` (must answer before submitting).
+All card types accept optional `body` (description below title, supports markdown) and `required` (must answer before submitting).
 
-Each answer also carries an optional `comment` field — the participant can add a note to any card.
+Each answer also carries an optional `comment` field — the respondent can add a note to any card.
 
 ## Session Hub
 
 Participants can view multiple sessions in one browser page by visiting `/hub` and pasting session GUIDs or URLs. Sessions appear as tabs with notification dots when cards update in background tabs.
+
+Each person enters their name when they first open a session. Their identity is stored in the browser so they can refresh the page or return later without re-entering their name. If someone enters the same name again, they get their previous answers back and can update them.
 
 ## Configuration
 
