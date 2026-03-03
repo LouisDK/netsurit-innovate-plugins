@@ -4,7 +4,7 @@
 // ============================================================================
 
 @description('Base name for all resources (lowercase, no special chars)')
-@minLength(3)
+@minLength(5)
 @maxLength(20)
 param baseName string = 'questionpad'
 
