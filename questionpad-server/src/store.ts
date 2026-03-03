@@ -1,13 +1,25 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Card, Answer, Session, SessionStatus } from './types.js';
+import type { Card, Answer, Session } from './types.js';
+
+interface Participant {
+  label: string;
+  cards: Card[];
+}
 
 interface CreateSessionInput {
   agentId?: string;
   title: string;
-  cards: Card[];
+  participants: Participant[];
+}
+
+interface CreateSessionResult {
+  agentId: string;
+  sessions: Array<{ label: string; guid: string }>;
 }
 
 interface CloseSessionResult {
+  guid: string;
+  label: string;
   finalAnswers: Answer[];
   globalComment?: string;
   submittedAt?: string;
@@ -22,39 +34,59 @@ export class SessionStore {
     this.ttlMs = ttlMinutes * 60 * 1000;
   }
 
-  createSession(input: CreateSessionInput): { guid: string; agentId: string } {
-    const guid = uuidv4();
+  createSession(input: CreateSessionInput): CreateSessionResult {
     const agentId = input.agentId || uuidv4();
 
     if (!this.agents.has(agentId)) {
       this.agents.set(agentId, new Set());
     }
-    this.agents.get(agentId)!.add(guid);
+    const agentGuids = this.agents.get(agentId)!;
 
     const now = Date.now();
-    this.sessions.set(guid, {
-      guid,
-      agentId,
-      title: input.title,
-      cards: input.cards,
-      answers: [],
-      status: 'created',
-      createdAt: now,
-      lastActivityAt: now,
-      cardVersion: 0,
-    });
+    const sessions: Array<{ label: string; guid: string }> = [];
 
-    return { guid, agentId };
+    for (const participant of input.participants) {
+      const guid = uuidv4();
+      agentGuids.add(guid);
+
+      this.sessions.set(guid, {
+        guid,
+        agentId,
+        label: participant.label,
+        title: input.title,
+        cards: participant.cards,
+        answers: [],
+        status: 'created',
+        createdAt: now,
+        lastActivityAt: now,
+        cardVersion: 0,
+      });
+
+      sessions.push({ label: participant.label, guid });
+    }
+
+    return { agentId, sessions };
   }
 
-  getSession(agentId: string, guid: string): Session | null {
-    const session = this.sessions.get(guid);
-    if (!session || session.agentId !== agentId) return null;
-    this.touch(guid);
-    return session;
+  getSessions(agentId: string, guids?: string[]): Session[] {
+    const agentGuids = this.agents.get(agentId);
+    if (!agentGuids) return [];
+
+    const targetGuids = guids
+      ? guids.filter(g => agentGuids.has(g))
+      : [...agentGuids];
+
+    const result: Session[] = [];
+    for (const guid of targetGuids) {
+      const session = this.sessions.get(guid);
+      if (session) {
+        this.touch(guid);
+        result.push(session);
+      }
+    }
+    return result;
   }
 
-  /** Browser-facing: no agentId check (browser knows the guid from the URL) */
   getSessionPublic(guid: string): Session | null {
     const session = this.sessions.get(guid);
     if (!session) return null;
@@ -104,31 +136,30 @@ export class SessionStore {
     return true;
   }
 
-  closeSession(agentId: string, guid: string): CloseSessionResult | null {
-    const session = this.sessions.get(guid);
-    if (!session || session.agentId !== agentId) return null;
+  closeSessions(agentId: string, guids?: string[]): CloseSessionResult[] {
+    const agentGuids = this.agents.get(agentId);
+    if (!agentGuids) return [];
 
-    session.status = 'closed';
-    this.touch(guid);
-    return {
-      finalAnswers: session.answers,
-      globalComment: session.globalComment,
-      submittedAt: session.submittedAt,
-    };
-  }
+    const targetGuids = guids
+      ? guids.filter(g => agentGuids.has(g))
+      : [...agentGuids];
 
-  getAllSessions(agentId: string): Session[] {
-    const guids = this.agents.get(agentId);
-    if (!guids) return [];
-    const result: Session[] = [];
-    for (const guid of guids) {
+    const results: CloseSessionResult[] = [];
+    for (const guid of targetGuids) {
       const session = this.sessions.get(guid);
-      if (session) {
-        this.touch(guid);
-        result.push(session);
-      }
+      if (!session) continue;
+
+      session.status = 'closed';
+      this.touch(guid);
+      results.push({
+        guid,
+        label: session.label,
+        finalAnswers: session.answers,
+        globalComment: session.globalComment,
+        submittedAt: session.submittedAt,
+      });
     }
-    return result;
+    return results;
   }
 
   purgeExpired(): void {

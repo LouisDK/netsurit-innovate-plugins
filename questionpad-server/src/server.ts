@@ -39,13 +39,14 @@ app.post('/mcp', async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 });
 
-// GET /session/:guid — serve the SPA if session exists
+// GET /hub — serve the hub page (no session validation)
+app.get('/hub', (req, res) => {
+  const htmlPath = path.join(__dirname, '..', 'public', 'app.html');
+  res.sendFile(htmlPath);
+});
+
+// GET /session/:guid — serve the SPA (hub JS validates via API)
 app.get('/session/:guid', (req, res) => {
-  const session = store.getSessionPublic(req.params.guid);
-  if (!session) {
-    res.status(404).json({ error: 'Session not found' });
-    return;
-  }
   const htmlPath = path.join(__dirname, '..', 'public', 'app.html');
   res.sendFile(htmlPath);
 });
@@ -58,6 +59,7 @@ app.get('/api/sessions/:guid', (req, res) => {
     return;
   }
   res.json({
+    label: session.label,
     title: session.title,
     cards: session.cards,
     answers: session.answers,

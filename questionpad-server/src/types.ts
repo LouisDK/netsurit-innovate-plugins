@@ -32,6 +32,7 @@ export interface Answer {
 export interface Session {
   guid: string;
   agentId: string;
+  label: string;
   title: string;
   cards: Card[];
   answers: Answer[];

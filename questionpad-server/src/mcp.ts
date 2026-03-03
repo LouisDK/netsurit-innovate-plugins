@@ -24,6 +24,11 @@ const CardSchema = z.object({
   placeholder: z.string().optional(),
 });
 
+const ParticipantSchema = z.object({
+  label: z.string(),
+  cards: z.array(CardSchema),
+});
+
 function text(obj: unknown): [{ type: 'text'; text: string }] {
   return [{ type: 'text', text: JSON.stringify(obj) }];
 }
@@ -31,77 +36,53 @@ function text(obj: unknown): [{ type: 'text'; text: string }] {
 export function createMcpServer(store: SessionStore, baseUrl: string): McpServer {
   const server = new McpServer({
     name: 'questionpad-server',
-    version: '0.1.0',
+    version: '0.2.0',
   });
 
   // 1. create_session
   server.registerTool(
     'create_session',
     {
-      description: 'Create a new QuestionPad session with a set of cards.',
+      description: 'Create a new QuestionPad session with one or more participants.',
       inputSchema: {
         agentId: z.string().optional(),
         title: z.string(),
-        cards: z.array(CardSchema),
+        participants: z.array(ParticipantSchema).min(1),
       },
     },
     (args) => {
-      const { guid, agentId } = store.createSession({
+      const result = store.createSession({
         agentId: args.agentId,
         title: args.title,
-        cards: args.cards,
+        participants: args.participants,
       });
-      const url = `${baseUrl}/session/${guid}`;
-      return { content: text({ guid, url, agentId }) };
-    },
-  );
-
-  // 2. get_session_status
-  server.registerTool(
-    'get_session_status',
-    {
-      description: 'Get the current status and answers for a session.',
-      inputSchema: {
-        agentId: z.string(),
-        guid: z.string(),
-      },
-    },
-    (args) => {
-      const session = store.getSession(args.agentId, args.guid);
-      if (!session) {
-        return {
-          isError: true,
-          content: text({ error: 'Session not found' }),
-        };
-      }
-      return {
-        content: text({
-          status: session.status,
-          title: session.title,
-          cards: session.cards,
-          answers: session.answers,
-          submittedAt: session.submittedAt,
-          globalComment: session.globalComment,
-        }),
-      };
-    },
-  );
-
-  // 3. get_all_sessions
-  server.registerTool(
-    'get_all_sessions',
-    {
-      description: 'Get all sessions for a given agent.',
-      inputSchema: {
-        agentId: z.string(),
-      },
-    },
-    (args) => {
-      const sessions = store.getAllSessions(args.agentId);
-      const result = sessions.map((s) => ({
+      const sessions = result.sessions.map(s => ({
+        label: s.label,
         guid: s.guid,
+        url: `${baseUrl}/session/${s.guid}`,
+      }));
+      return { content: text({ agentId: result.agentId, sessions }) };
+    },
+  );
+
+  // 2. get_sessions
+  server.registerTool(
+    'get_sessions',
+    {
+      description: 'Get the current status and answers for sessions. Returns all sessions for the agent, or a filtered subset.',
+      inputSchema: {
+        agentId: z.string(),
+        guids: z.array(z.string()).optional(),
+      },
+    },
+    (args) => {
+      const sessions = store.getSessions(args.agentId, args.guids);
+      const result = sessions.map(s => ({
+        guid: s.guid,
+        label: s.label,
         title: s.title,
         status: s.status,
+        cards: s.cards,
         answers: s.answers,
         submittedAt: s.submittedAt,
         globalComment: s.globalComment,
@@ -110,7 +91,7 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
     },
   );
 
-  // 4. update_session
+  // 3. update_session
   server.registerTool(
     'update_session',
     {
@@ -133,31 +114,19 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
     },
   );
 
-  // 5. close_session
+  // 4. close_sessions
   server.registerTool(
-    'close_session',
+    'close_sessions',
     {
-      description: 'Close a session and retrieve the final answers.',
+      description: 'Close sessions and retrieve the final answers. Closes all sessions for the agent, or a filtered subset.',
       inputSchema: {
         agentId: z.string(),
-        guid: z.string(),
+        guids: z.array(z.string()).optional(),
       },
     },
     (args) => {
-      const result = store.closeSession(args.agentId, args.guid);
-      if (!result) {
-        return {
-          isError: true,
-          content: text({ error: 'Session not found' }),
-        };
-      }
-      return {
-        content: text({
-          finalAnswers: result.finalAnswers,
-          globalComment: result.globalComment,
-          submittedAt: result.submittedAt,
-        }),
-      };
+      const results = store.closeSessions(args.agentId, args.guids);
+      return { content: text(results) };
     },
   );
 
