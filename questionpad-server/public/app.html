@@ -831,7 +831,9 @@ body {
 
   // --- Hub session management ---
   function saveGuids() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.keys(hubSessions)));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.keys(hubSessions)));
+    } catch(e) { /* localStorage unavailable or full */ }
   }
 
   function loadGuids() {
@@ -927,8 +929,17 @@ body {
     activeCardId = null;
     currentCardVersion = s.currentCardVersion;
 
+    // Populate pendingAnswers so render() rebuilds from session state
+    pendingAnswers = Object.keys(answers).map(function(cardId) {
+      return { cardId: cardId, value: answers[cardId], comment: comments[cardId] || undefined };
+    });
+    var savedSubmitted = submitted;
+
     renderTabs();
     render();
+
+    submitted = savedSubmitted;
+    if (hubSessions[activeGuid]) hubSessions[activeGuid].submitted = submitted;
 
     // Show participant label
     var labelEl = document.getElementById('participant-label');
