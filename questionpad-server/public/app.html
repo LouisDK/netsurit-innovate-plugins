@@ -644,17 +644,116 @@ body {
   .rating-btn { width: 34px; height: 34px; font-size: 0.9rem; }
   .card-answer-summary { max-width: 120px; }
 }
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  max-width: 800px;
+  margin: 10px auto 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.tab-bar:empty { display: none; }
+
+.tab {
+  position: relative;
+  padding: 8px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--card-hover);
+  font-weight: 600;
+}
+
+.tab .tab-dot {
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d4a017;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+.tab.has-update .tab-dot { display: block; }
+.tab.has-update { animation: glow-tab 1.5s ease-out; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+@keyframes glow-tab {
+  0% { box-shadow: 0 0 12px rgba(212, 160, 23, 0.5); }
+  100% { box-shadow: none; }
+}
+
+/* Add session input */
+.add-session-bar {
+  max-width: 800px;
+  margin: 8px auto 0;
+  display: flex;
+  gap: 8px;
+}
+.add-session-bar input {
+  flex: 1;
+  padding: 6px 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+  outline: none;
+}
+.add-session-bar input:focus { border-color: var(--progress); }
+.add-session-bar input::placeholder { color: var(--muted); }
+.add-session-bar button {
+  padding: 6px 14px;
+  background: var(--progress);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.add-session-bar button:hover { background: var(--submit-hover); }
+
+/* Participant label */
+.participant-label {
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 800px;
+  margin: 4px auto 0;
+}
 </style>
 </head>
 <body>
 
-<div id="app-waiting" class="waiting">Waiting for data...</div>
+<div id="app-waiting" class="waiting">Loading...</div>
 <div id="app-root" style="display:none;">
   <div class="header">
     <div class="header-top">
       <h1 id="req-title"></h1>
       <span class="progress-count" id="progress-count"></span>
     </div>
+    <div class="tab-bar" id="tab-bar"></div>
+    <div class="add-session-bar" id="add-session-bar">
+      <input type="text" id="add-session-input" placeholder="Paste a session GUID or URL to join another session...">
+      <button id="add-session-btn">Add</button>
+    </div>
+    <div class="participant-label" id="participant-label"></div>
     <div class="progress-bar-wrap">
       <div class="progress-bar-fill" id="progress-bar"></div>
     </div>
@@ -669,33 +768,41 @@ body {
     </div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
 (function() {
   "use strict";
 
-  var guid = window.location.pathname.split('/session/')[1];
+  // --- Multi-session hub state ---
+  var hubSessions = {};    // guid -> session state object
+  var activeGuid = null;   // currently visible session's guid
+  var STORAGE_KEY = 'questionpad-hub-sessions';
 
+  // Module-level "current session" state -- card builders read/write these
   let requestData = null;
-  let answers = {};    // cardId -> answer object
-  let comments = {};   // cardId -> comment string
-  let pendingAnswers = [];  // answers to restore after render (used during form updates)
-  let activeCardId = null;  // currently focused card
-  let statuses = {};   // cardId -> 'unanswered' | 'answered' | 'skipped'
+  let answers = {};
+  let comments = {};
+  let pendingAnswers = [];
+  let activeCardId = null;
+  let statuses = {};
   let submitted = false;
   var currentCardVersion = null;
 
+  // Detect entry point
+  var pathGuid = null;
+  var pathMatch = window.location.pathname.match(/\/session\/([^/]+)/);
+  if (pathMatch) pathGuid = pathMatch[1];
+
   // --- Fetch session data from server ---
-  async function fetchSessionData() {
+  async function fetchSessionData(guid) {
     var res = await fetch('/api/sessions/' + guid);
     if (!res.ok) return null;
     return res.json();
   }
 
   // --- Send individual answer to server ---
-  function sendAnswer(cardId, value, comment) {
+  function sendAnswer(guid, cardId, value, comment) {
     fetch('/api/sessions/' + guid + '/answers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -722,25 +829,178 @@ body {
     });
   }
 
-  // --- Poll for form changes every 5 seconds ---
-  var pollInterval = setInterval(async function() {
-    if (submitted) return;
-    var data = await fetchSessionData();
-    if (!data) return;
-    if (data.status === 'closed' || data.status === 'expired') {
-      clearInterval(pollInterval);
-      showSessionEnded();
-      return;
+  // --- Hub session management ---
+  function saveGuids() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.keys(hubSessions)));
+  }
+
+  function loadGuids() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    catch(e) { return []; }
+  }
+
+  function removeSession(guid) {
+    if (hubSessions[guid]) {
+      if (hubSessions[guid].pollInterval) clearInterval(hubSessions[guid].pollInterval);
+      delete hubSessions[guid];
+      saveGuids();
+      if (activeGuid === guid) {
+        var remaining = Object.keys(hubSessions);
+        if (remaining.length > 0) {
+          switchTab(remaining[0]);
+        } else {
+          activeGuid = null;
+          document.getElementById('cards-container').innerHTML = '';
+          document.getElementById('req-title').textContent = 'QuestionPad Hub';
+          document.getElementById('participant-label').style.display = 'none';
+        }
+      }
+      renderTabs();
     }
-    if (currentCardVersion !== null && data.cardVersion !== currentCardVersion) {
-      requestData.cards = data.cards;
-      // Stash server answers so render() can restore them
-      pendingAnswers = data.answers || [];
-      render();
-      showToast('Form updated by facilitator');
+  }
+
+  async function addSession(guid) {
+    if (hubSessions[guid]) {
+      showToast('Session already added');
+      return false;
     }
-    currentCardVersion = data.cardVersion;
-  }, 5000);
+    var data = await fetchSessionData(guid);
+    if (!data) {
+      showToast('Session not found');
+      return false;
+    }
+
+    var sessionState = {
+      guid: guid,
+      requestData: { title: data.title, cards: data.cards, label: data.label },
+      answers: {},
+      comments: {},
+      statuses: {},
+      submitted: data.status === 'submitted' || data.status === 'closed',
+      currentCardVersion: data.cardVersion,
+      activeCardId: null,
+      hasUpdate: false,
+      pollInterval: null,
+    };
+
+    // Restore answers from server
+    (data.answers || []).forEach(function(a) {
+      sessionState.answers[a.cardId] = a.value;
+      if (a.comment) sessionState.comments[a.cardId] = a.comment;
+      sessionState.statuses[a.cardId] = 'answered';
+    });
+    // Initialize unanswered statuses
+    data.cards.forEach(function(card) {
+      if (!sessionState.statuses[card.id]) {
+        sessionState.statuses[card.id] = 'unanswered';
+        sessionState.comments[card.id] = '';
+      }
+    });
+
+    hubSessions[guid] = sessionState;
+    saveGuids();
+    renderTabs();
+    startPolling(guid);
+    switchTab(guid);
+    return true;
+  }
+
+  function switchTab(guid) {
+    if (!hubSessions[guid]) return;
+    // Save current session state back
+    if (activeGuid && hubSessions[activeGuid]) {
+      hubSessions[activeGuid].answers = answers;
+      hubSessions[activeGuid].comments = comments;
+      hubSessions[activeGuid].statuses = statuses;
+      hubSessions[activeGuid].submitted = submitted;
+      hubSessions[activeGuid].activeCardId = activeCardId;
+    }
+    // Restore new session state to globals
+    var s = hubSessions[guid];
+    s.hasUpdate = false;
+    activeGuid = guid;
+    requestData = s.requestData;
+    answers = s.answers;
+    comments = s.comments;
+    statuses = s.statuses;
+    submitted = s.submitted;
+    activeCardId = null;
+    currentCardVersion = s.currentCardVersion;
+
+    renderTabs();
+    render();
+
+    // Show participant label
+    var labelEl = document.getElementById('participant-label');
+    if (s.requestData.label) {
+      labelEl.textContent = 'Participant: ' + s.requestData.label;
+      labelEl.style.display = '';
+    } else {
+      labelEl.style.display = 'none';
+    }
+  }
+
+  function renderTabs() {
+    var bar = document.getElementById('tab-bar');
+    bar.innerHTML = '';
+    var guids = Object.keys(hubSessions);
+    if (guids.length <= 1) { bar.style.display = 'none'; return; }
+    bar.style.display = '';
+    guids.forEach(function(guid) {
+      var s = hubSessions[guid];
+      var tab = document.createElement('div');
+      tab.className = 'tab' + (guid === activeGuid ? ' active' : '') + (s.hasUpdate ? ' has-update' : '');
+      var label = s.requestData.label
+        ? s.requestData.title + ' \u2014 ' + s.requestData.label
+        : s.requestData.title;
+      tab.textContent = label;
+      var dot = document.createElement('span');
+      dot.className = 'tab-dot';
+      tab.appendChild(dot);
+      tab.addEventListener('click', function() { switchTab(guid); });
+      bar.appendChild(tab);
+    });
+  }
+
+  function startPolling(guid) {
+    if (hubSessions[guid].pollInterval) return;
+    hubSessions[guid].pollInterval = setInterval(async function() {
+      var s = hubSessions[guid];
+      if (!s) return;
+      if (s.submitted) return;
+      var data = await fetchSessionData(guid);
+      if (!data) {
+        removeSession(guid);
+        return;
+      }
+      if (data.status === 'closed' || data.status === 'expired') {
+        clearInterval(s.pollInterval);
+        s.pollInterval = null;
+        s.submitted = true;
+        if (guid === activeGuid) {
+          submitted = true;
+          showSessionEnded();
+        }
+        return;
+      }
+      if (data.cardVersion !== s.currentCardVersion) {
+        s.currentCardVersion = data.cardVersion;
+        s.requestData = { title: data.title, cards: data.cards, label: data.label };
+        if (guid === activeGuid) {
+          // Re-render active form with pending answers from server
+          pendingAnswers = data.answers || [];
+          currentCardVersion = data.cardVersion;
+          requestData = s.requestData;
+          render();
+          showToast('Form updated by facilitator');
+        } else {
+          // Background tab -- mark update
+          s.hasUpdate = true;
+          renderTabs();
+        }
+      }
+    }, 5000);
+  }
 
   // --- Markdown renderer ---
   function renderMarkdown(text) {
@@ -1002,7 +1262,7 @@ body {
     if (submitted) return;
     answers[cardId] = answer;
     statuses[cardId] = 'answered';
-    sendAnswer(cardId, answers[cardId], comments[cardId]);
+    sendAnswer(activeGuid, cardId, answers[cardId], comments[cardId]);
     updateProgress();
     updateCardUI(cardId);
   }
@@ -1100,7 +1360,7 @@ body {
     });
     commentArea.querySelector('textarea').addEventListener('input', function() {
       comments[card.id] = this.value;
-      sendAnswer(card.id, answers[card.id] || null, comments[card.id]);
+      sendAnswer(activeGuid, card.id, answers[card.id] || null, comments[card.id]);
     });
     body.appendChild(commentToggle);
     body.appendChild(commentArea);
@@ -1772,8 +2032,9 @@ body {
   // --- Submit ---
   async function doSubmit() {
     submitted = true;
+    if (hubSessions[activeGuid]) hubSessions[activeGuid].submitted = true;
 
-    await fetch('/api/sessions/' + guid + '/submit', {
+    await fetch('/api/sessions/' + activeGuid + '/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ globalComment: document.getElementById('global-comment').value || '' }),
@@ -1796,38 +2057,60 @@ body {
     updateProgress();
   }
 
-  // --- Init on load ---
+  // --- Add session input handler ---
+  document.getElementById('add-session-btn').addEventListener('click', function() {
+    var input = document.getElementById('add-session-input');
+    var val = input.value.trim();
+    var match = val.match(/\/session\/([^/?#]+)/);
+    var guid = match ? match[1] : val;
+    if (!guid) return;
+    input.value = '';
+    addSession(guid);
+  });
+
+  document.getElementById('add-session-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      document.getElementById('add-session-btn').click();
+    }
+  });
+
+  // --- Ctrl+1-9 for tab switching ---
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key >= '1' && e.key <= '9') {
+      var idx = parseInt(e.key) - 1;
+      var guids = Object.keys(hubSessions);
+      if (idx < guids.length) {
+        e.preventDefault();
+        switchTab(guids[idx]);
+      }
+    }
+  });
+
+  // --- Init ---
   async function init() {
-    var data = await fetchSessionData();
-    if (!data) {
-      document.getElementById('app-waiting').innerHTML = '<p style="color: var(--muted); text-align: center; padding: 40px;">Session not found or expired.</p>';
+    var savedGuids = loadGuids();
+    if (pathGuid && savedGuids.indexOf(pathGuid) < 0) {
+      savedGuids.unshift(pathGuid);
+    }
+
+    document.getElementById('app-waiting').style.display = 'none';
+    document.getElementById('app-root').style.display = '';
+
+    if (savedGuids.length === 0) {
+      document.getElementById('req-title').textContent = 'QuestionPad Hub';
       return;
     }
-    requestData = { id: guid, title: data.title, cards: data.cards };
-    currentCardVersion = data.cardVersion;
 
-    // Restore any existing answers from server
-    if (data.answers && data.answers.length > 0) {
-      data.answers.forEach(function(a) {
-        answers[a.cardId] = a.value;
-        if (a.comment) comments[a.cardId] = a.comment;
-      });
+    for (var i = 0; i < savedGuids.length; i++) {
+      await addSession(savedGuids[i]);
     }
 
-    render();
-
-    if (data.status === 'submitted') {
-      doSubmit(); // show submitted state
-    } else if (data.status === 'closed' || data.status === 'expired') {
-      showSessionEnded();
+    if (Object.keys(hubSessions).length === 0) {
+      document.getElementById('req-title').textContent = 'QuestionPad Hub';
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+  init();
 
 })();
 </script>
