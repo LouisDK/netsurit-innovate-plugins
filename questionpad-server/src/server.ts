@@ -51,7 +51,7 @@ app.get('/session/:guid', (req, res) => {
   res.sendFile(htmlPath);
 });
 
-// GET /api/sessions/:guid — return session data for the browser app
+// GET /api/sessions/:guid — return session data for the browser app (no answers — those come via join)
 app.get('/api/sessions/:guid', (req, res) => {
   const session = store.getSessionPublic(req.params.guid);
   if (!session) {
@@ -63,33 +63,48 @@ app.get('/api/sessions/:guid', (req, res) => {
     title: session.title,
     description: session.description,
     cards: session.cards,
-    answers: session.answers,
     status: session.status,
     cardVersion: session.cardVersion,
   });
 });
 
-// POST /api/sessions/:guid/answers — submit a single answer
+// POST /api/sessions/:guid/join — join a shared session by name
+app.post('/api/sessions/:guid/join', (req, res) => {
+  const { name } = req.body as { name?: string };
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    res.status(400).json({ error: 'Name is required' });
+    return;
+  }
+  const result = store.joinSession(req.params.guid, name.trim());
+  if (!result) {
+    res.status(404).json({ error: 'Session not found or already closed' });
+    return;
+  }
+  res.json(result);
+});
+
+// POST /api/sessions/:guid/answers — submit a single answer for a respondent
 app.post('/api/sessions/:guid/answers', (req, res) => {
-  const { cardId, value, comment } = req.body as {
+  const { respondentId, cardId, value, comment } = req.body as {
+    respondentId: string;
     cardId: string;
     value: unknown;
     comment?: string;
   };
-  const ok = store.submitAnswer(req.params.guid, { cardId, value, comment });
+  const ok = store.submitAnswer(req.params.guid, respondentId, { cardId, value, comment });
   if (!ok) {
-    res.status(404).json({ error: 'Session not found or already closed' });
+    res.status(404).json({ error: 'Session not found, respondent not found, or already closed/submitted' });
     return;
   }
   res.json({ success: true });
 });
 
-// POST /api/sessions/:guid/submit — submit the whole session
+// POST /api/sessions/:guid/submit — submit for a respondent
 app.post('/api/sessions/:guid/submit', (req, res) => {
-  const { globalComment } = req.body as { globalComment?: string };
-  const ok = store.submitSession(req.params.guid, globalComment);
+  const { respondentId, globalComment } = req.body as { respondentId: string; globalComment?: string };
+  const ok = store.submitRespondent(req.params.guid, respondentId, globalComment);
   if (!ok) {
-    res.status(404).json({ error: 'Session not found or already closed' });
+    res.status(404).json({ error: 'Session not found, respondent not found, or already closed' });
     return;
   }
   res.json({ success: true });

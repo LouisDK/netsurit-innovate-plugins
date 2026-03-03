@@ -35,8 +35,11 @@ const CardSchema = z.object({
 });
 
 const ParticipantSchema = z.object({
-  label: z.string().describe('Participant name or identifier (e.g. "Alice", "Bob"). Shown in the browser UI and returned with answers so you can match responses to people.'),
-  cards: z.array(CardSchema).describe('The question cards for this participant. Each participant can have a different set of cards.'),
+  label: z.string().describe(
+    'Session label or group name (e.g. "Sales Team", "Engineering"). ' +
+    'Multiple people can open the same URL for this session and each enters their name to join as a respondent.'
+  ),
+  cards: z.array(CardSchema).describe('The question cards for this session. All respondents who join will see the same cards.'),
 });
 
 function text(obj: unknown): [{ type: 'text'; text: string }] {
@@ -46,16 +49,16 @@ function text(obj: unknown): [{ type: 'text'; text: string }] {
 export function createMcpServer(store: SessionStore, baseUrl: string): McpServer {
   const server = new McpServer({
     name: 'QuestionPad',
-    version: '0.2.0',
+    version: '0.3.0',
     description:
       'Collect structured feedback from humans via interactive web forms. ' +
       'Use QuestionPad when you need to ask people questions and get their answers — ' +
       'for example, gathering meeting feedback, running polls, or collecting approvals.\n\n' +
       'Workflow:\n' +
-      '1. Call create_session with a title and one or more participants, each with their own question cards.\n' +
-      '2. Share the returned URL(s) with participants — each person gets a unique link to their form.\n' +
-      '3. Poll with get_sessions to check whether participants have answered (look for status "submitted").\n' +
-      '4. When done, call close_sessions to lock the sessions and retrieve final answers.\n\n' +
+      '1. Call create_session with a title and one or more participants (shared sessions), each with their own question cards.\n' +
+      '2. Share the returned URL(s) — multiple people can open the same URL, enter their name, and fill in the form independently as respondents.\n' +
+      '3. Poll with get_sessions to check respondent progress (each respondent has their own status and answers).\n' +
+      '4. When done, call close_sessions to lock the sessions and retrieve all respondent answers.\n\n' +
       'The agentId returned by create_session is your ownership token — save it and pass it to all subsequent calls. ' +
       'It ensures your sessions are isolated from other agents using the same server.',
   });
@@ -106,12 +109,11 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
     {
       title: 'Get Sessions',
       description:
-        'Poll for participant answers. Returns the current status and any submitted answers for your sessions.\n\n' +
+        'Poll for respondent answers. Returns the current status and respondent data for your sessions.\n\n' +
         'Pass guids to check specific sessions, or omit to get all sessions for your agentId.\n\n' +
-        'Session status lifecycle: "created" → "in_progress" (participant opened the form) → "submitted" (participant clicked submit). ' +
-        'A session becomes "closed" after you call close_sessions, or "expired" if it times out.\n\n' +
-        'Each answer has a cardId matching the card\'s id, a value (shape depends on card type — see create_session), ' +
-        'and an optional comment. The globalComment is a free-text field the participant can fill in at the bottom of the form.',
+        'Session status lifecycle: "created" → "in_progress" (first respondent joined) → "closed" (after close_sessions) or "expired" (timed out).\n\n' +
+        'Each session contains a respondents array. Each respondent has a name, status ("in_progress" or "submitted"), ' +
+        'answers (each with cardId, value, optional comment), and an optional globalComment.',
       inputSchema: {
         agentId: z.string().describe('Your agent identifier (returned by create_session).'),
         guids: z.array(z.string()).optional().describe(
@@ -127,9 +129,13 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
         title: s.title,
         status: s.status,
         cards: s.cards,
-        answers: s.answers,
-        submittedAt: s.submittedAt,
-        globalComment: s.globalComment,
+        respondents: s.respondents.map(r => ({
+          name: r.name,
+          status: r.status,
+          answers: r.answers,
+          globalComment: r.globalComment,
+          submittedAt: r.submittedAt,
+        })),
       }));
       return { content: text(result) };
     },
@@ -140,10 +146,10 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
     {
       title: 'Update Session',
       description:
-        'Replace the question cards on a session that hasn\'t been submitted yet. ' +
+        'Replace the question cards on a session that hasn\'t been closed yet. ' +
         'Use this to add follow-up questions, correct mistakes, or adapt cards based on earlier answers from other participants.\n\n' +
         'The participant\'s browser will automatically pick up the new cards within a few seconds. ' +
-        'Any previously submitted answers for removed cards are discarded.',
+        'Any previously submitted answers for removed cards are discarded from all respondents.',
       inputSchema: {
         agentId: z.string().describe('Your agent identifier (returned by create_session).'),
         guid: z.string().describe('The specific session GUID to update.'),
@@ -167,10 +173,10 @@ export function createMcpServer(store: SessionStore, baseUrl: string): McpServer
     {
       title: 'Close Sessions',
       description:
-        'Close sessions and retrieve the final answers. Closed sessions are locked — ' +
-        'participants can no longer submit or change answers, and the form shows a "Session Ended" message.\n\n' +
+        'Close sessions and retrieve the final answers from all respondents. Closed sessions are locked — ' +
+        'no new respondents can join and existing respondents can no longer submit or change answers.\n\n' +
         'Pass guids to close specific sessions, or omit to close all sessions for your agentId. ' +
-        'Returns the final answers for each closed session, including the participant label, answers, and globalComment.',
+        'Returns each closed session with its respondents array, where each respondent includes their name, answers, globalComment, and submittedAt.',
       inputSchema: {
         agentId: z.string().describe('Your agent identifier (returned by create_session).'),
         guids: z.array(z.string()).optional().describe(

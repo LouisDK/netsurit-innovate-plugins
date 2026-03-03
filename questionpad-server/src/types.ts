@@ -8,7 +8,9 @@ export type CardType =
   | 'slider'
   | 'range-slider';
 
-export type SessionStatus = 'created' | 'in_progress' | 'submitted' | 'closed' | 'expired';
+export type SessionStatus = 'created' | 'in_progress' | 'closed' | 'expired';
+
+export type RespondentStatus = 'in_progress' | 'submitted';
 
 export interface Card {
   id: string;
@@ -16,17 +18,27 @@ export interface Card {
   title: string;
   body?: string;
   required?: boolean;
-  options?: string[];        // for multiple-choice, multi-select
-  min?: number;              // for rating, slider, range-slider
-  max?: number;              // for rating, slider, range-slider
-  step?: number;             // for slider, range-slider
-  placeholder?: string;      // for free-text
+  options?: string[];
+  min?: number;
+  max?: number;
+  step?: number;
+  placeholder?: string;
 }
 
 export interface Answer {
   cardId: string;
-  value: unknown;            // type depends on card type
+  value: unknown;
   comment?: string;
+}
+
+export interface Respondent {
+  respondentId: string;
+  name: string;
+  answers: Answer[];
+  globalComment?: string;
+  status: RespondentStatus;
+  joinedAt: string;
+  submittedAt?: string;
 }
 
 export interface Session {
@@ -36,12 +48,9 @@ export interface Session {
   title: string;
   description?: string;
   cards: Card[];
-  answers: Answer[];
+  respondents: Respondent[];
   status: SessionStatus;
-  globalComment?: string;
   createdAt: number;
   lastActivityAt: number;
-  submittedAt?: string;
-  /** Incremented each time cards are updated, so browser can detect changes */
   cardVersion: number;
 }

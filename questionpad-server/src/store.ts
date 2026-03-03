@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Card, Answer, Session } from './types.js';
+import type { Card, Answer, Session, Respondent } from './types.js';
 
 interface Participant {
   label: string;
@@ -18,12 +18,20 @@ interface CreateSessionResult {
   sessions: Array<{ label: string; guid: string }>;
 }
 
+interface JoinResult {
+  respondentId: string;
+  answers: Answer[];
+}
+
 interface CloseSessionResult {
   guid: string;
   label: string;
-  finalAnswers: Answer[];
-  globalComment?: string;
-  submittedAt?: string;
+  respondents: Array<{
+    name: string;
+    answers: Answer[];
+    globalComment?: string;
+    submittedAt?: string;
+  }>;
 }
 
 export class SessionStore {
@@ -57,7 +65,7 @@ export class SessionStore {
         title: input.title,
         description: input.description,
         cards: participant.cards,
-        answers: [],
+        respondents: [],
         status: 'created',
         createdAt: now,
         lastActivityAt: now,
@@ -68,6 +76,36 @@ export class SessionStore {
     }
 
     return { agentId, sessions };
+  }
+
+  joinSession(guid: string, name: string): JoinResult | null {
+    const session = this.sessions.get(guid);
+    if (!session || session.status === 'closed' || session.status === 'expired') return null;
+
+    // Check for existing respondent with exact same name
+    const existing = session.respondents.find(r => r.name === name);
+    if (existing) {
+      this.touch(guid);
+      return { respondentId: existing.respondentId, answers: existing.answers };
+    }
+
+    // Create new respondent
+    const respondent: Respondent = {
+      respondentId: uuidv4(),
+      name,
+      answers: [],
+      status: 'in_progress',
+      joinedAt: new Date().toISOString(),
+    };
+    session.respondents.push(respondent);
+
+    // Transition from created to in_progress on first join
+    if (session.status === 'created') {
+      session.status = 'in_progress';
+    }
+
+    this.touch(guid);
+    return { respondentId: respondent.respondentId, answers: respondent.answers };
   }
 
   getSessions(agentId: string, guids?: string[]): Session[] {
@@ -96,31 +134,35 @@ export class SessionStore {
     return session;
   }
 
-  submitAnswer(guid: string, answer: Answer): boolean {
+  submitAnswer(guid: string, respondentId: string, answer: Answer): boolean {
     const session = this.sessions.get(guid);
     if (!session || session.status === 'closed' || session.status === 'expired') return false;
 
-    const existing = session.answers.findIndex(a => a.cardId === answer.cardId);
+    const respondent = session.respondents.find(r => r.respondentId === respondentId);
+    if (!respondent) return false;
+    if (respondent.status === 'submitted') return false;
+
+    const existing = respondent.answers.findIndex(a => a.cardId === answer.cardId);
     if (existing >= 0) {
-      session.answers[existing] = answer;
+      respondent.answers[existing] = answer;
     } else {
-      session.answers.push(answer);
+      respondent.answers.push(answer);
     }
 
-    if (session.status === 'created') {
-      session.status = 'in_progress';
-    }
     this.touch(guid);
     return true;
   }
 
-  submitSession(guid: string, globalComment?: string): boolean {
+  submitRespondent(guid: string, respondentId: string, globalComment?: string): boolean {
     const session = this.sessions.get(guid);
     if (!session || session.status === 'closed' || session.status === 'expired') return false;
 
-    session.status = 'submitted';
-    session.submittedAt = new Date().toISOString();
-    session.globalComment = globalComment;
+    const respondent = session.respondents.find(r => r.respondentId === respondentId);
+    if (!respondent) return false;
+
+    respondent.status = 'submitted';
+    respondent.submittedAt = new Date().toISOString();
+    respondent.globalComment = globalComment;
     this.touch(guid);
     return true;
   }
@@ -131,7 +173,12 @@ export class SessionStore {
     if (session.status === 'closed' || session.status === 'expired') return false;
 
     const newCardIds = new Set(cards.map(c => c.id));
-    session.answers = session.answers.filter(a => newCardIds.has(a.cardId));
+
+    // Filter answers on each respondent
+    for (const respondent of session.respondents) {
+      respondent.answers = respondent.answers.filter(a => newCardIds.has(a.cardId));
+    }
+
     session.cards = cards;
     session.cardVersion++;
     this.touch(guid);
@@ -156,9 +203,12 @@ export class SessionStore {
       results.push({
         guid,
         label: session.label,
-        finalAnswers: session.answers,
-        globalComment: session.globalComment,
-        submittedAt: session.submittedAt,
+        respondents: session.respondents.map(r => ({
+          name: r.name,
+          answers: r.answers,
+          globalComment: r.globalComment,
+          submittedAt: r.submittedAt,
+        })),
       });
     }
     return results;

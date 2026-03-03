@@ -14,14 +14,14 @@ describe('SessionStore', () => {
     const result = store.createSession({
       title: 'Review',
       participants: [
-        { label: 'Alice', cards: [{ id: 'q1', type: 'free-text', title: 'Name?' }] },
-        { label: 'Bob', cards: [{ id: 'q1', type: 'yes-no', title: 'OK?' }] },
+        { label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Name?' }] },
+        { label: 'Tech', cards: [{ id: 'q1', type: 'yes-no', title: 'OK?' }] },
       ],
     });
     expect(result.agentId).toBeTruthy();
     expect(result.sessions).toHaveLength(2);
-    expect(result.sessions[0].label).toBe('Alice');
-    expect(result.sessions[1].label).toBe('Bob');
+    expect(result.sessions[0].label).toBe('Sales');
+    expect(result.sessions[1].label).toBe('Tech');
     expect(result.sessions[0].guid).not.toBe(result.sessions[1].guid);
   });
 
@@ -55,6 +55,81 @@ describe('SessionStore', () => {
     expect(second.agentId).toBe(first.agentId);
   });
 
+  it('initializes sessions with empty respondents', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'A', cards: [] }],
+    });
+    const session = store.getSessionPublic(result.sessions[0].guid);
+    expect(session?.respondents).toEqual([]);
+  });
+
+  // --- joinSession ---
+
+  it('creates a respondent on join', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+    });
+    const guid = result.sessions[0].guid;
+    const join = store.joinSession(guid, 'Alice');
+    expect(join).not.toBeNull();
+    expect(join!.respondentId).toBeTruthy();
+    expect(join!.answers).toEqual([]);
+  });
+
+  it('returns existing respondent on same name (with answers)', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+    });
+    const guid = result.sessions[0].guid;
+    const first = store.joinSession(guid, 'Alice')!;
+    store.submitAnswer(guid, first.respondentId, { cardId: 'q1', value: 'hello' });
+    const second = store.joinSession(guid, 'Alice')!;
+    expect(second.respondentId).toBe(first.respondentId);
+    expect(second.answers).toHaveLength(1);
+    expect(second.answers[0].value).toBe('hello');
+  });
+
+  it('allows multiple people to join the same session', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [] }],
+    });
+    const guid = result.sessions[0].guid;
+    const alice = store.joinSession(guid, 'Alice')!;
+    const bob = store.joinSession(guid, 'Bob')!;
+    expect(alice.respondentId).not.toBe(bob.respondentId);
+    const session = store.getSessionPublic(guid)!;
+    expect(session.respondents).toHaveLength(2);
+  });
+
+  it('rejects join on closed session', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [] }],
+    });
+    const guid = result.sessions[0].guid;
+    store.closeSessions(result.agentId);
+    expect(store.joinSession(guid, 'Alice')).toBeNull();
+  });
+
+  it('rejects join on nonexistent guid', () => {
+    expect(store.joinSession('nonexistent', 'Alice')).toBeNull();
+  });
+
+  it('transitions session from created to in_progress on first join', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [] }],
+    });
+    const guid = result.sessions[0].guid;
+    expect(store.getSessionPublic(guid)!.status).toBe('created');
+    store.joinSession(guid, 'Alice');
+    expect(store.getSessionPublic(guid)!.status).toBe('in_progress');
+  });
+
   // --- getSessions ---
 
   it('returns all sessions for an agent', () => {
@@ -86,7 +161,7 @@ describe('SessionStore', () => {
     expect(store.getSessions('unknown-agent')).toEqual([]);
   });
 
-  it('ignores guids belonging to other agents', () => {
+  it('ignores guids belonging to other agents (cross-agent isolation)', () => {
     const agent1 = store.createSession({
       title: 'A1',
       participants: [{ label: 'X', cards: [] }],
@@ -117,56 +192,112 @@ describe('SessionStore', () => {
 
   // --- submitAnswer ---
 
-  it('records answer and transitions status to in_progress', () => {
+  it('records answer on correct respondent', () => {
     const result = store.createSession({
       title: 'T',
-      participants: [{ label: 'A', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
     });
     const guid = result.sessions[0].guid;
-    store.submitAnswer(guid, { cardId: 'q1', value: 'hello' });
-    const session = store.getSessionPublic(guid);
-    expect(session?.status).toBe('in_progress');
-    expect(session?.answers).toHaveLength(1);
-    expect(session?.answers[0].value).toBe('hello');
+    const join = store.joinSession(guid, 'Alice')!;
+    const ok = store.submitAnswer(guid, join.respondentId, { cardId: 'q1', value: 'hello' });
+    expect(ok).toBe(true);
+    const session = store.getSessionPublic(guid)!;
+    const respondent = session.respondents.find(r => r.respondentId === join.respondentId)!;
+    expect(respondent.answers).toHaveLength(1);
+    expect(respondent.answers[0].value).toBe('hello');
   });
 
-  it('updates an existing answer', () => {
+  it('updates existing answer on same cardId', () => {
     const result = store.createSession({
       title: 'T',
-      participants: [{ label: 'A', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
     });
     const guid = result.sessions[0].guid;
-    store.submitAnswer(guid, { cardId: 'q1', value: 'first' });
-    store.submitAnswer(guid, { cardId: 'q1', value: 'second' });
-    const session = store.getSessionPublic(guid);
-    expect(session?.answers).toHaveLength(1);
-    expect(session?.answers[0].value).toBe('second');
+    const join = store.joinSession(guid, 'Alice')!;
+    store.submitAnswer(guid, join.respondentId, { cardId: 'q1', value: 'first' });
+    store.submitAnswer(guid, join.respondentId, { cardId: 'q1', value: 'second' });
+    const session = store.getSessionPublic(guid)!;
+    const respondent = session.respondents.find(r => r.respondentId === join.respondentId)!;
+    expect(respondent.answers).toHaveLength(1);
+    expect(respondent.answers[0].value).toBe('second');
+  });
+
+  it('isolates answers between respondents', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+    });
+    const guid = result.sessions[0].guid;
+    const alice = store.joinSession(guid, 'Alice')!;
+    const bob = store.joinSession(guid, 'Bob')!;
+    store.submitAnswer(guid, alice.respondentId, { cardId: 'q1', value: 'alice-answer' });
+    store.submitAnswer(guid, bob.respondentId, { cardId: 'q1', value: 'bob-answer' });
+    const session = store.getSessionPublic(guid)!;
+    const aliceR = session.respondents.find(r => r.name === 'Alice')!;
+    const bobR = session.respondents.find(r => r.name === 'Bob')!;
+    expect(aliceR.answers[0].value).toBe('alice-answer');
+    expect(bobR.answers[0].value).toBe('bob-answer');
   });
 
   it('rejects answer on closed session', () => {
     const result = store.createSession({
       title: 'T',
-      participants: [{ label: 'A', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
     });
     const guid = result.sessions[0].guid;
+    const join = store.joinSession(guid, 'Alice')!;
     store.closeSessions(result.agentId);
-    expect(store.submitAnswer(guid, { cardId: 'q1', value: 'nope' })).toBe(false);
+    expect(store.submitAnswer(guid, join.respondentId, { cardId: 'q1', value: 'nope' })).toBe(false);
   });
 
-  // --- submitSession ---
-
-  it('marks session as submitted with global comment', () => {
+  it('rejects answer with unknown respondentId', () => {
     const result = store.createSession({
       title: 'T',
-      participants: [{ label: 'A', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
     });
     const guid = result.sessions[0].guid;
-    store.submitAnswer(guid, { cardId: 'q1', value: 'hi' });
-    store.submitSession(guid, 'Great form');
-    const session = store.getSessionPublic(guid);
-    expect(session?.status).toBe('submitted');
-    expect(session?.submittedAt).toBeTruthy();
-    expect(session?.globalComment).toBe('Great form');
+    store.joinSession(guid, 'Alice');
+    expect(store.submitAnswer(guid, 'unknown-respondent', { cardId: 'q1', value: 'nope' })).toBe(false);
+  });
+
+  it('rejects answer on submitted respondent', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+    });
+    const guid = result.sessions[0].guid;
+    const join = store.joinSession(guid, 'Alice')!;
+    store.submitAnswer(guid, join.respondentId, { cardId: 'q1', value: 'hello' });
+    store.submitRespondent(guid, join.respondentId);
+    expect(store.submitAnswer(guid, join.respondentId, { cardId: 'q1', value: 'nope' })).toBe(false);
+  });
+
+  // --- submitRespondent ---
+
+  it('marks respondent as submitted with comment', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+    });
+    const guid = result.sessions[0].guid;
+    const join = store.joinSession(guid, 'Alice')!;
+    store.submitAnswer(guid, join.respondentId, { cardId: 'q1', value: 'hi' });
+    const ok = store.submitRespondent(guid, join.respondentId, 'Great form');
+    expect(ok).toBe(true);
+    const session = store.getSessionPublic(guid)!;
+    const respondent = session.respondents.find(r => r.respondentId === join.respondentId)!;
+    expect(respondent.status).toBe('submitted');
+    expect(respondent.submittedAt).toBeTruthy();
+    expect(respondent.globalComment).toBe('Great form');
+  });
+
+  it('rejects submitRespondent with unknown respondentId', () => {
+    const result = store.createSession({
+      title: 'T',
+      participants: [{ label: 'Sales', cards: [] }],
+    });
+    const guid = result.sessions[0].guid;
+    expect(store.submitRespondent(guid, 'unknown-respondent')).toBe(false);
   });
 
   // --- updateCards ---
@@ -174,21 +305,21 @@ describe('SessionStore', () => {
   it('updates cards and increments cardVersion', () => {
     const result = store.createSession({
       title: 'T',
-      participants: [{ label: 'A', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
     });
     const guid = result.sessions[0].guid;
     store.updateCards(result.agentId, guid, [{ id: 'q2', type: 'yes-no', title: 'New Q' }]);
-    const session = store.getSessionPublic(guid);
-    expect(session?.cards).toHaveLength(1);
-    expect(session?.cards[0].id).toBe('q2');
-    expect(session?.cardVersion).toBe(1);
+    const session = store.getSessionPublic(guid)!;
+    expect(session.cards).toHaveLength(1);
+    expect(session.cards[0].id).toBe('q2');
+    expect(session.cardVersion).toBe(1);
   });
 
-  it('preserves answers for cards that still exist after update', () => {
+  it('preserves respondent answers for remaining cards', () => {
     const result = store.createSession({
       title: 'T',
       participants: [{
-        label: 'A',
+        label: 'Sales',
         cards: [
           { id: 'q1', type: 'free-text', title: 'Q1' },
           { id: 'q2', type: 'yes-no', title: 'Q2' },
@@ -196,22 +327,24 @@ describe('SessionStore', () => {
       }],
     });
     const guid = result.sessions[0].guid;
-    store.submitAnswer(guid, { cardId: 'q1', value: 'keep me' });
-    store.submitAnswer(guid, { cardId: 'q2', value: true });
+    const join = store.joinSession(guid, 'Alice')!;
+    store.submitAnswer(guid, join.respondentId, { cardId: 'q1', value: 'keep me' });
+    store.submitAnswer(guid, join.respondentId, { cardId: 'q2', value: true });
     store.updateCards(result.agentId, guid, [
       { id: 'q1', type: 'free-text', title: 'Q1 updated' },
       { id: 'q3', type: 'rating', title: 'New Q' },
     ]);
-    const session = store.getSessionPublic(guid);
-    expect(session?.answers).toHaveLength(1);
-    expect(session?.answers[0].cardId).toBe('q1');
-    expect(session?.answers[0].value).toBe('keep me');
+    const session = store.getSessionPublic(guid)!;
+    const respondent = session.respondents.find(r => r.respondentId === join.respondentId)!;
+    expect(respondent.answers).toHaveLength(1);
+    expect(respondent.answers[0].cardId).toBe('q1');
+    expect(respondent.answers[0].value).toBe('keep me');
   });
 
   it('rejects updateCards with wrong agentId', () => {
     const result = store.createSession({
       title: 'T',
-      participants: [{ label: 'A', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
+      participants: [{ label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] }],
     });
     const guid = result.sessions[0].guid;
     expect(store.updateCards('wrong-agent', guid, [])).toBe(false);
@@ -219,18 +352,28 @@ describe('SessionStore', () => {
 
   // --- closeSessions ---
 
-  it('closes all sessions when guids omitted', () => {
+  it('closes all sessions with respondents', () => {
     const result = store.createSession({
       title: 'Test',
       participants: [
-        { label: 'A', cards: [] },
-        { label: 'B', cards: [] },
+        { label: 'Sales', cards: [{ id: 'q1', type: 'free-text', title: 'Q' }] },
+        { label: 'Tech', cards: [] },
       ],
     });
+    const salesGuid = result.sessions[0].guid;
+    const alice = store.joinSession(salesGuid, 'Alice')!;
+    store.submitAnswer(salesGuid, alice.respondentId, { cardId: 'q1', value: 'hi' });
+    store.submitRespondent(salesGuid, alice.respondentId, 'Done');
+
     const closed = store.closeSessions(result.agentId);
     expect(closed).toHaveLength(2);
-    expect(closed[0].label).toBe('A');
-    expect(closed[1].label).toBe('B');
+    const salesClosed = closed.find(c => c.label === 'Sales')!;
+    expect(salesClosed.respondents).toHaveLength(1);
+    expect(salesClosed.respondents[0].name).toBe('Alice');
+    expect(salesClosed.respondents[0].answers).toHaveLength(1);
+    expect(salesClosed.respondents[0].globalComment).toBe('Done');
+    const techClosed = closed.find(c => c.label === 'Tech')!;
+    expect(techClosed.respondents).toEqual([]);
   });
 
   it('closes a subset of sessions', () => {
@@ -255,7 +398,7 @@ describe('SessionStore', () => {
     expect(store.closeSessions('unknown-agent')).toEqual([]);
   });
 
-  it('ignores guids belonging to other agents', () => {
+  it('ignores guids belonging to other agents (cross-agent isolation)', () => {
     const agent1 = store.createSession({
       title: 'A1',
       participants: [{ label: 'X', cards: [] }],
