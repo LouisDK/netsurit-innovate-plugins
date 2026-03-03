@@ -999,10 +999,17 @@ body {
       var joinBtn = document.getElementById('join-btn');
       var nameInput = document.getElementById('join-name');
       nameInput.value = '';
-      nameInput.focus();
+
+      // Clone elements to remove old handlers before defining new ones
+      var newBtn = joinBtn.cloneNode(true);
+      joinBtn.parentNode.replaceChild(newBtn, joinBtn);
+
+      var newInput = nameInput.cloneNode(true);
+      nameInput.parentNode.replaceChild(newInput, nameInput);
+      newInput.focus();
 
       var handler = async function() {
-        var name = nameInput.value.trim();
+        var name = newInput.value.trim();
         if (!name) return;
         var result = await joinSessionApi(guid, name);
         if (!result) {
@@ -1016,14 +1023,7 @@ body {
         addSessionAfterJoin(guid, result);
       };
 
-      // Remove old handlers
-      var newBtn = joinBtn.cloneNode(true);
-      joinBtn.parentNode.replaceChild(newBtn, joinBtn);
       newBtn.addEventListener('click', handler);
-
-      var newInput = nameInput.cloneNode(true);
-      nameInput.parentNode.replaceChild(newInput, nameInput);
-      newInput.focus();
       newInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') newBtn.click();
       });
