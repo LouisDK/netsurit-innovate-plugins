@@ -972,6 +972,7 @@ body {
     });
     commentArea.querySelector('textarea').addEventListener('input', function() {
       comments[card.id] = this.value;
+      sendAnswer(card.id, answers[card.id] || null, comments[card.id]);
     });
     body.appendChild(commentToggle);
     body.appendChild(commentArea);
