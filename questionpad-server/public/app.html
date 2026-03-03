@@ -677,6 +677,7 @@ body {
   let answers = {};    // cardId -> answer object
   let comments = {};   // cardId -> comment string
   let pendingAnswers = [];  // answers to restore after render (used during form updates)
+  let activeCardId = null;  // currently focused card
   let statuses = {};   // cardId -> 'unanswered' | 'answered' | 'skipped'
   let submitted = false;
   var currentCardVersion = null;
@@ -885,6 +886,58 @@ body {
     if (submitted) btn.disabled = true;
   }
 
+  // --- Card focus management ---
+  function focusCard(cardId) {
+    if (submitted || cardId === activeCardId) return;
+    // Collapse previous card if it has an answer
+    if (activeCardId) {
+      var prevEl = document.getElementById('card-' + activeCardId);
+      if (prevEl && statuses[activeCardId] === 'answered') {
+        prevEl.classList.add('collapsed');
+      }
+    }
+    activeCardId = cardId;
+    // Expand the target card
+    var el = document.getElementById('card-' + cardId);
+    if (el) el.classList.remove('collapsed');
+  }
+
+  function focusNextCard() {
+    if (!requestData || submitted) return;
+    var cards = requestData.cards;
+    var currentIdx = cards.findIndex(function(c) { return c.id === activeCardId; });
+    // Find next unanswered card, or just the next card
+    for (var i = 1; i <= cards.length; i++) {
+      var nextIdx = (currentIdx + i) % cards.length;
+      var nextId = cards[nextIdx].id;
+      if (statuses[nextId] !== 'answered' && statuses[nextId] !== 'skipped') {
+        focusCard(nextId);
+        // Focus the first interactive element in the card
+        var nextEl = document.getElementById('card-' + nextId);
+        if (nextEl) {
+          var focusable = nextEl.querySelector('.card-body input, .card-body textarea, .card-body button, .card-body .toggle-switch, .card-body .option-label');
+          if (focusable) {
+            if (focusable.focus) focusable.focus();
+            else focusable.click();
+          }
+        }
+        return;
+      }
+    }
+  }
+
+  // --- Tab key: move to next card ---
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab' && !e.shiftKey && activeCardId && !submitted) {
+      // Only intercept Tab if we're inside a card
+      var activeEl = document.getElementById('card-' + activeCardId);
+      if (activeEl && activeEl.contains(document.activeElement)) {
+        e.preventDefault();
+        focusNextCard();
+      }
+    }
+  });
+
   // --- Set answer ---
   function setAnswer(cardId, answer) {
     if (submitted) return;
@@ -893,6 +946,13 @@ body {
     sendAnswer(cardId, answers[cardId], comments[cardId]);
     updateProgress();
     updateCardUI(cardId);
+
+    // Auto-advance for instant-answer types
+    var card = requestData.cards.find(function(c) { return c.id === cardId; });
+    var instantTypes = ['multiple-choice', 'approve-reject', 'yes-no', 'rating'];
+    if (card && instantTypes.indexOf(card.type) >= 0) {
+      setTimeout(focusNextCard, 150);
+    }
   }
 
   // --- Update single card UI ---
@@ -949,12 +1009,17 @@ body {
       if (submitted) return;
       const isCollapsed = div.classList.contains('collapsed');
       div.classList.toggle('collapsed');
-      // Track when user manually expands a card so we don't auto-collapse it
       if (isCollapsed) {
-        div.dataset.userExpanded = 'true';
-      } else {
-        delete div.dataset.userExpanded;
+        focusCard(card.id);
       }
+    });
+
+    // Track focus when user interacts with any element inside the card
+    div.addEventListener('focusin', function() {
+      focusCard(card.id);
+    });
+    div.addEventListener('mousedown', function() {
+      focusCard(card.id);
     });
     div.appendChild(header);
 
