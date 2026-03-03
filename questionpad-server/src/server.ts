@@ -110,6 +110,11 @@ app.post('/api/sessions/:guid/submit', (req, res) => {
   res.json({ success: true });
 });
 
+// Health check for Azure Container Apps liveness probe
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.listen(PORT, () => {
   console.log(`QuestionPad server listening on port ${PORT}`);
   console.log(`Base URL: ${BASE_URL}`);
