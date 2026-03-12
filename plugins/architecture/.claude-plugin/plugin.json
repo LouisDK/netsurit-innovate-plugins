@@ -1,0 +1,8 @@
+{
+  "name": "architecture",
+  "description": "Opinionated architectural standard for building single-tenant business applications on Azure with Container Apps, Next.js, Fastify, PostgreSQL, and Bicep IaC",
+  "version": "0.1.0",
+  "author": {
+    "name": "louisdk"
+  }
+}

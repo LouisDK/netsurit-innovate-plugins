@@ -1,0 +1,46 @@
+# =============================================================================
+# Local Development Services
+#
+# This is a reference template. Copy to docker-compose.dev.yaml in your
+# project root and adapt ports, credentials, and service names.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yaml up -d
+#   docker compose -f docker-compose.dev.yaml down
+#
+# Services:
+#   - PostgreSQL 16 on port 5433 (offset to avoid conflicts with local PG)
+#   - Azurite on ports 10100-10102 (Azure Storage emulator)
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: {app-name}-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: localdevpassword
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: {app-name}-azurite
+    restart: unless-stopped
+    ports:
+      - "10100:10000"  # Blob
+      - "10101:10001"  # Queue
+      - "10102:10002"  # Table
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0"
+
+volumes:
+  pgdata:
