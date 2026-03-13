@@ -1,0 +1,6 @@
+node_modules/
+.claude/
+.playwright-mcp/
+inquiry/
+_bmad/
+_bmad-output/
