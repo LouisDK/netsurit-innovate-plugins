@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delta Analysis Report</title>
+  <style>
+    :root {
+      --bg: #0f1117; --bg2: #1a1d27; --fg: #e2e8f0; --fg-muted: #94a3b8;
+      --accent: #6366f1; --border: #2d3148; --card: #1e2235;
+      --aligned: #22c55e; --partial: #f59e0b; --divergent: #ef4444;
+      --sev1: #6366f1; --sev2: #f59e0b; --sev3: #f97316; --sev4: #ef4444;
+      --registered: #22c55e; --unregistered: #94a3b8;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc; --bg2: #ffffff; --fg: #0f172a; --fg-muted: #64748b;
+      --accent: #4f46e5; --border: #e2e8f0; --card: #ffffff;
+      --aligned: #16a34a; --partial: #d97706; --divergent: #dc2626;
+      --sev1: #4f46e5; --sev2: #d97706; --sev3: #ea580c; --sev4: #dc2626;
+      --registered: #16a34a; --unregistered: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; }
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; }
+    h2 { font-size: 0.8rem; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; }
+    h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .header { border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+    .header-meta { color: var(--fg-muted); font-size: 0.875rem; margin-top: 0.25rem; }
+    .section { margin-bottom: 2.5rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1.25rem; }
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--fg-muted); border-radius: 0.375rem; padding: 0.3rem 0.7rem; cursor: pointer; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0; }
+
+    /* Alignment status badge */
+    .rating-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+    .rating-aligned { background: rgba(34,197,94,0.15); background: color-mix(in srgb, var(--aligned) 15%, transparent); color: var(--aligned); }
+    .rating-partial { background: rgba(245,158,11,0.15); background: color-mix(in srgb, var(--partial) 15%, transparent); color: var(--partial); }
+    .rating-divergent { background: rgba(239,68,68,0.15); background: color-mix(in srgb, var(--divergent) 15%, transparent); color: var(--divergent); }
+
+    /* Overall status */
+    .overall-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+
+    /* Alignment table */
+    .alignment-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .alignment-table th { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 2px solid var(--border); color: var(--fg-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+    .alignment-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); }
+    .alignment-table tr:last-child td { border-bottom: none; }
+    .alignment-table .col-category { width: 30%; }
+    .alignment-table .col-rating { width: 25%; }
+    .alignment-table .col-summary { width: 45%; color: var(--fg-muted); }
+
+    /* Findings summary badges */
+    .summary-badges { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .count-badge { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; border-radius: 0.5rem; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--border); background: var(--card); }
+    .count-badge .count { font-size: 1.1rem; font-weight: 700; }
+    .count-badge.sev1 .count { color: var(--sev1); }
+    .count-badge.sev2 .count { color: var(--sev2); }
+    .count-badge.sev3 .count { color: var(--sev3); }
+    .count-badge.sev4 .count { color: var(--sev4); }
+    .count-badge.registered .count { color: var(--registered); }
+
+    /* Finding cards */
+    .findings-group { margin-bottom: 1.5rem; }
+    .findings-group-title { font-size: 0.75rem; font-weight: 600; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+    .finding-card { background: var(--card); border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem 1.25rem; margin-bottom: 0.75rem; }
+    .finding-card-header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+    .sev-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; white-space: nowrap; }
+    .sev-1 { background: rgba(99,102,241,0.15); background: color-mix(in srgb, var(--sev1) 15%, transparent); color: var(--sev1); }
+    .sev-2 { background: rgba(245,158,11,0.15); background: color-mix(in srgb, var(--sev2) 15%, transparent); color: var(--sev2); }
+    .sev-3 { background: rgba(249,115,22,0.15); background: color-mix(in srgb, var(--sev3) 15%, transparent); color: var(--sev3); }
+    .sev-4 { background: rgba(239,68,68,0.15); background: color-mix(in srgb, var(--sev4) 15%, transparent); color: var(--sev4); }
+    .cat-badge { font-size: 0.7rem; color: var(--fg-muted); padding: 0.15rem 0.4rem; border: 1px solid var(--border); border-radius: 0.25rem; }
+    .registry-badge { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px; }
+    .registry-registered { background: rgba(34,197,94,0.15); background: color-mix(in srgb, var(--registered) 15%, transparent); color: var(--registered); }
+    .registry-unregistered { background: rgba(148,163,184,0.1); background: color-mix(in srgb, var(--unregistered) 10%, transparent); color: var(--unregistered); }
+    .finding-field { font-size: 0.8rem; margin-bottom: 0.35rem; }
+    .finding-field .label { color: var(--fg-muted); font-weight: 600; font-size: 0.75rem; }
+    .finding-field .value { margin-top: 0.1rem; }
+    .finding-location { font-family: monospace; font-size: 0.8rem; color: var(--accent); }
+    .finding-reference { font-size: 0.75rem; color: var(--fg-muted); font-style: italic; }
+    .finding-rationale { font-size: 0.8rem; padding: 0.5rem 0.75rem; margin-top: 0.5rem; border-left: 3px solid var(--registered); background: rgba(34,197,94,0.05); background: color-mix(in srgb, var(--registered) 5%, transparent); border-radius: 0 0.25rem 0.25rem 0; }
+    .finding-impact { font-size: 0.8rem; padding: 0.5rem 0.75rem; margin-top: 0.5rem; border-left: 3px solid var(--accent); background: rgba(99,102,241,0.05); background: color-mix(in srgb, var(--accent) 5%, transparent); border-radius: 0 0.25rem 0.25rem 0; }
+
+    /* Filter controls */
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .filter-btn { background: var(--card); border: 1px solid var(--border); color: var(--fg-muted); border-radius: 0.375rem; padding: 0.25rem 0.6rem; cursor: pointer; font-size: 0.75rem; font-weight: 600; }
+    .filter-btn.active { border-color: var(--accent); color: var(--accent); }
+
+    footer { border-top: 1px solid var(--border); margin-top: 3rem; padding-top: 1.5rem; text-align: center; color: var(--fg-muted); font-size: 0.8rem; font-style: italic; }
+
+    @media (max-width: 640px) {
+      .summary-badges { flex-direction: column; }
+      .finding-card-header { flex-direction: column; align-items: flex-start; }
+      .filter-bar { flex-direction: column; }
+      .filter-bar .filter-sep { display: none; }
+      .header { flex-direction: column; }
+    }
+    @media print {
+      .theme-toggle, .filter-bar { display: none; }
+      body { background: white; color: black; }
+      .card, .finding-card { border-color: #ccc; background: white; }
+      .alignment-table th, .alignment-table td { border-color: #ccc; }
+      .rating-badge, .sev-badge, .registry-badge { border: 1px solid #999; background: transparent; color: #333; }
+    }
+  </style>
+</head>
+<body>
+<div class="container" id="app">
+  <noscript><p style="color:var(--fg-muted);font-size:0.9rem;">This report requires JavaScript to render. Please open the file directly in a browser.</p></noscript>
+  <p class="js-loading" style="color:var(--fg-muted);font-size:0.9rem;">Waiting for report data…</p>
+</div>
+<script>
+function el(tag, attrs) {
+  var e = document.createElement(tag);
+  var children = Array.prototype.slice.call(arguments, 2);
+  var a = attrs || {};
+  for (var k in a) {
+    if (k === 'class') e.className = a[k];
+    else e.setAttribute(k, a[k]);
+  }
+  for (var i = 0; i < children.length; i++) {
+    var c = children[i];
+    if (c == null) continue;
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  }
+  return e;
+}
+
+function themeToggle() {
+  var btn = el('button', { class: 'theme-toggle' }, '\u2600 Light');
+  btn.onclick = function() {
+    var html = document.documentElement;
+    var isLight = html.getAttribute('data-theme') === 'light';
+    html.setAttribute('data-theme', isLight ? 'dark' : 'light');
+    btn.textContent = isLight ? '\u2600 Light' : '\u263E Dark';
+  };
+  return btn;
+}
+
+/* Rating icons — text + icon for accessibility (colour-blind, grayscale print) */
+var RATING_MAP = {
+  'Aligned':           { cls: 'rating-aligned',   icon: '\u2713', text: 'Aligned' },
+  'Partially Aligned': { cls: 'rating-partial',   icon: '\u26A0', text: 'Partial' },
+  'Divergent':         { cls: 'rating-divergent',  icon: '\u2717', text: 'Divergent' }
+};
+
+var SEV_MAP = {
+  1: { cls: 'sev-1', icon: '\uD83D\uDCA1', label: 'Pattern opportunity' },
+  2: { cls: 'sev-2', icon: '\u26A0',  label: 'Drift' },
+  3: { cls: 'sev-3', icon: '\u2BC5',  label: 'Significant deviation' },
+  4: { cls: 'sev-4', icon: '\u26D4',  label: 'Critical deviation' }
+};
+
+function ratingBadge(rating) {
+  var r = RATING_MAP[rating] || RATING_MAP['Aligned'];
+  return el('span', { class: 'rating-badge ' + r.cls }, r.icon + ' ' + r.text);
+}
+
+function sevBadge(severity) {
+  var s = SEV_MAP[severity] || SEV_MAP[1];
+  return el('span', { class: 'sev-badge ' + s.cls }, s.icon + ' ' + s.label);
+}
+
+function registryBadge(registry) {
+  var isReg = registry && registry.indexOf('Registered') === 0;
+  var cls = isReg ? 'registry-registered' : 'registry-unregistered';
+  var icon = isReg ? '\u2713' : '\u2014';
+  return el('span', { class: 'registry-badge ' + cls }, icon + ' ' + registry);
+}
+
+function computeOverallStatus(categories) {
+  var hasDivergent = false;
+  var hasPartial = false;
+  for (var i = 0; i < categories.length; i++) {
+    if (categories[i].rating === 'Divergent') hasDivergent = true;
+    if (categories[i].rating === 'Partially Aligned') hasPartial = true;
+  }
+  if (hasDivergent) return { cls: 'rating-divergent', text: 'Action Needed', icon: '\u2717' };
+  if (hasPartial) return { cls: 'rating-partial', text: 'Mostly Aligned', icon: '\u26A0' };
+  return { cls: 'rating-aligned', text: 'Well Aligned', icon: '\u2713' };
+}
+
+/* ── Executive Summary ── */
+function renderExecutiveSummary(data) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Executive Summary'));
+  var card = el('div', { class: 'card' });
+  var overall = computeOverallStatus(data.categoryAlignment);
+  var overallBadge = el('span', { class: 'overall-badge ' + overall.cls }, overall.icon + ' ' + overall.text);
+
+  var meta = el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:0.5rem 1.5rem;font-size:0.85rem;' });
+  meta.appendChild(el('div', {}, el('span', { style: 'color:var(--fg-muted);' }, 'Project: '), el('strong', {}, data.meta.projectName)));
+  meta.appendChild(el('div', {}, el('span', { style: 'color:var(--fg-muted);' }, 'Date: '), el('strong', {}, data.meta.date)));
+  meta.appendChild(el('div', {}, el('span', { style: 'color:var(--fg-muted);' }, 'Depth: '), el('strong', {}, data.meta.depth)));
+  meta.appendChild(el('div', {}, el('span', { style: 'color:var(--fg-muted);' }, 'Standard: '), el('strong', {}, 'v' + data.meta.standardVersion)));
+  meta.appendChild(el('div', {}, el('span', { style: 'color:var(--fg-muted);' }, 'Overall: '), overallBadge));
+  meta.appendChild(el('div', {}, el('span', { style: 'color:var(--fg-muted);' }, 'Registry: '), el('strong', {}, data.meta.deviationRegistry)));
+  card.appendChild(meta);
+  section.appendChild(card);
+  return section;
+}
+
+/* ── Category Alignment Table ── */
+function renderCategoryAlignment(categories) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Category Alignment'));
+  var table = el('table', { class: 'alignment-table' });
+  var thead = el('thead', {},
+    el('tr', {},
+      el('th', { class: 'col-category' }, 'Category'),
+      el('th', { class: 'col-rating' }, 'Rating'),
+      el('th', { class: 'col-summary' }, 'Summary')
+    )
+  );
+  table.appendChild(thead);
+  var tbody = el('tbody', {});
+  for (var i = 0; i < categories.length; i++) {
+    var cat = categories[i];
+    var row = el('tr', {},
+      el('td', {}, cat.category),
+      el('td', {}, ratingBadge(cat.rating)),
+      el('td', { class: 'col-summary' }, cat.summary)
+    );
+    tbody.appendChild(row);
+  }
+  table.appendChild(tbody);
+  var card = el('div', { class: 'card', style: 'padding:0;overflow:auto;' });
+  card.appendChild(table);
+  section.appendChild(card);
+  return section;
+}
+
+/* ── Findings Summary ── */
+function renderFindingsSummary(summary) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Findings Summary'));
+  var badges = el('div', { class: 'summary-badges' });
+
+  var items = [
+    { key: 'patternOpportunities', label: 'Pattern Opportunities', cls: 'sev1', icon: '\uD83D\uDCA1' },
+    { key: 'drift', label: 'Drift', cls: 'sev2', icon: '\u26A0' },
+    { key: 'significantDeviations', label: 'Significant', cls: 'sev3', icon: '\u2BC5' },
+    { key: 'criticalDeviations', label: 'Critical', cls: 'sev4', icon: '\u26D4' },
+    { key: 'registeredDeviations', label: 'Registered', cls: 'registered', icon: '\u2713' }
+  ];
+
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var badge = el('div', { class: 'count-badge ' + item.cls },
+      el('span', { class: 'count' }, String(summary[item.key] || 0)),
+      el('span', {}, item.icon + ' ' + item.label)
+    );
+    badges.appendChild(badge);
+  }
+  section.appendChild(badges);
+  return section;
+}
+
+/* ── Findings Detail ── */
+var activeFilters = { severity: 'all', registry: 'all' };
+
+function renderFindingsDetail(findings) {
+  var section = el('div', { class: 'section' });
+  section.appendChild(el('h2', {}, 'Findings'));
+
+  /* Filter bar */
+  var filterBar = el('div', { class: 'filter-bar' });
+  var sevFilters = [
+    { val: 'all', label: 'All' },
+    { val: '4', label: '\u26D4 Critical' },
+    { val: '3', label: '\u2BC5 Significant' },
+    { val: '2', label: '\u26A0 Drift' },
+    { val: '1', label: '\uD83D\uDCA1 Opportunity' }
+  ];
+  for (var i = 0; i < sevFilters.length; i++) {
+    (function(f) {
+      var btn = el('button', { class: 'filter-btn' + (activeFilters.severity === f.val ? ' active' : '') }, f.label);
+      btn.setAttribute('data-filter', 'severity');
+      btn.setAttribute('data-value', f.val);
+      btn.onclick = function() {
+        activeFilters.severity = f.val;
+        refreshFindings(findings, section);
+      };
+      filterBar.appendChild(btn);
+    })(sevFilters[i]);
+  }
+  /* Registry filter */
+  var regFilters = [
+    { val: 'all', label: 'All Status' },
+    { val: 'registered', label: '\u2713 Registered' },
+    { val: 'unregistered', label: '\u2014 Unregistered' }
+  ];
+  filterBar.appendChild(el('span', { class: 'filter-sep', style: 'border-left:1px solid var(--border);margin:0 0.25rem;' }));
+  for (var i = 0; i < regFilters.length; i++) {
+    (function(f) {
+      var btn = el('button', { class: 'filter-btn' + (activeFilters.registry === f.val ? ' active' : '') }, f.label);
+      btn.setAttribute('data-filter', 'registry');
+      btn.setAttribute('data-value', f.val);
+      btn.onclick = function() {
+        activeFilters.registry = f.val;
+        refreshFindings(findings, section);
+      };
+      filterBar.appendChild(btn);
+    })(regFilters[i]);
+  }
+  section.appendChild(filterBar);
+
+  var container = el('div', { class: 'findings-container' });
+  section.appendChild(container);
+
+  populateFindings(findings, container);
+  return section;
+}
+
+function populateFindings(findings, container) {
+  container.innerHTML = '';
+
+  /* Filter */
+  var filtered = [];
+  for (var i = 0; i < findings.length; i++) {
+    var f = findings[i];
+    if (activeFilters.severity !== 'all' && String(f.severity) !== activeFilters.severity) continue;
+    if (activeFilters.registry === 'registered' && (!f.registry || f.registry.indexOf('Registered') !== 0)) continue;
+    if (activeFilters.registry === 'unregistered' && f.registry && f.registry.indexOf('Registered') === 0) continue;
+    filtered.push(f);
+  }
+
+  if (filtered.length === 0) {
+    container.appendChild(el('div', { class: 'card', style: 'text-align:center;color:var(--fg-muted);' }, 'No findings match the current filters.'));
+    return;
+  }
+
+  /* Group by severity (critical first) */
+  var groups = { 4: [], 3: [], 2: [], 1: [] };
+  for (var i = 0; i < filtered.length; i++) {
+    var sev = filtered[i].severity;
+    if (!groups[sev]) groups[sev] = [];
+    groups[sev].push(filtered[i]);
+  }
+
+  var sevOrder = [4, 3, 2, 1];
+  for (var si = 0; si < sevOrder.length; si++) {
+    var sev = sevOrder[si];
+    var items = groups[sev];
+    if (!items || items.length === 0) continue;
+    var s = SEV_MAP[sev];
+    var group = el('div', { class: 'findings-group' });
+    group.appendChild(el('div', { class: 'findings-group-title' }, s.icon + ' ' + s.label + ' (' + items.length + ')'));
+    for (var fi = 0; fi < items.length; fi++) {
+      group.appendChild(renderFindingCard(items[fi]));
+    }
+    container.appendChild(group);
+  }
+}
+
+function refreshFindings(findings, section) {
+  /* Update filter button states */
+  var btns = section.querySelectorAll('.filter-btn');
+  for (var i = 0; i < btns.length; i++) {
+    var filterType = btns[i].getAttribute('data-filter');
+    var filterVal = btns[i].getAttribute('data-value');
+    if (filterType === 'severity') {
+      btns[i].className = 'filter-btn' + (activeFilters.severity === filterVal ? ' active' : '');
+    } else if (filterType === 'registry') {
+      btns[i].className = 'filter-btn' + (activeFilters.registry === filterVal ? ' active' : '');
+    }
+  }
+  var container = section.querySelector('.findings-container');
+  populateFindings(findings, container);
+}
+
+function renderFindingCard(f) {
+  var card = el('div', { class: 'finding-card' });
+  var header = el('div', { class: 'finding-card-header' });
+  header.appendChild(sevBadge(f.severity));
+  header.appendChild(el('span', { class: 'cat-badge' }, f.category));
+  header.appendChild(registryBadge(f.registry || 'Unregistered'));
+  card.appendChild(header);
+  card.appendChild(el('h3', {}, f.pattern));
+
+  if (f.location) {
+    var loc = el('div', { class: 'finding-field' });
+    loc.appendChild(el('span', { class: 'finding-location' }, f.location));
+    card.appendChild(loc);
+  }
+
+  var obs = el('div', { class: 'finding-field' });
+  obs.appendChild(el('div', { class: 'label' }, 'Observation'));
+  obs.appendChild(el('div', { class: 'value' }, f.observation));
+  card.appendChild(obs);
+
+  var rec = el('div', { class: 'finding-field' });
+  rec.appendChild(el('div', { class: 'label' }, 'Recommendation'));
+  rec.appendChild(el('div', { class: 'value' }, f.recommendation));
+  card.appendChild(rec);
+
+  if (f.reference) {
+    card.appendChild(el('div', { class: 'finding-reference' }, 'Ref: ' + f.reference));
+  }
+
+  if (f.rationale) {
+    card.appendChild(el('div', { class: 'finding-rationale' }, '\u2713 Registered rationale: ' + f.rationale));
+  }
+
+  if (f.refactoringImpact) {
+    card.appendChild(el('div', { class: 'finding-impact' }, 'Refactoring impact: ' + f.refactoringImpact));
+  }
+
+  return card;
+}
+
+/* ── Footer ── */
+function renderFooter(meta) {
+  var f = el('footer', {});
+  f.appendChild(document.createTextNode('Generated by ns-appfoundry-delta-analysis'));
+  f.appendChild(el('br'));
+  f.appendChild(document.createTextNode(meta.date + ' \u00B7 Standard v' + meta.standardVersion));
+  if (meta.architectureDoc) {
+    f.appendChild(el('br'));
+    f.appendChild(document.createTextNode('Architecture doc: ' + meta.architectureDoc));
+  }
+  return f;
+}
+
+/* ── Entry point ── */
+function renderReport(data) {
+  var app = document.getElementById('app');
+  if (!data || !data.meta || !data.categoryAlignment || !data.findingsSummary) {
+    app.innerHTML = '<div class="card" style="margin-top:2rem;text-align:center;color:var(--fg-muted);"><p>Report data is missing or malformed. Expected REPORT_DATA with meta, categoryAlignment, and findingsSummary.</p></div>';
+    return;
+  }
+  app.innerHTML = '';
+
+  /* Header */
+  var headerLeft = el('div', {});
+  headerLeft.appendChild(el('h1', {}, 'Delta Analysis Report'));
+  headerLeft.appendChild(el('div', { class: 'header-meta' }, data.meta.projectName + ' \u00B7 ' + data.meta.depth + ' \u00B7 ' + data.meta.date));
+  app.appendChild(el('div', { class: 'header' }, headerLeft, themeToggle()));
+
+  /* Sections */
+  app.appendChild(renderExecutiveSummary(data));
+  app.appendChild(renderCategoryAlignment(data.categoryAlignment));
+  app.appendChild(renderFindingsSummary(data.findingsSummary));
+
+  if (data.findings && data.findings.length > 0) {
+    app.appendChild(renderFindingsDetail(data.findings));
+  } else {
+    var noFindings = el('div', { class: 'section' });
+    noFindings.appendChild(el('h2', {}, 'Findings'));
+    noFindings.appendChild(el('div', { class: 'card', style: 'text-align:center;padding:2rem;' },
+      el('p', { style: 'font-size:1.1rem;' }, '\u2713 No findings \u2014 this project is well-aligned with the architecture standard. Nice work!')
+    ));
+    app.appendChild(noFindings);
+  }
+
+  app.appendChild(renderFooter(data.meta));
+}
+
+window.loadReportData = function() {
+  var data = window.REPORT_DATA;
+  if (!data) return;
+  renderReport(data);
+};
+
+if (window.REPORT_DATA) window.loadReportData();
+</script>
+</body>
+</html>
