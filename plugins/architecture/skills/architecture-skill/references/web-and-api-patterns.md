@@ -12,6 +12,7 @@ This document complements:
 - `data-patterns.md`
 - `security.md`
 - `observability.md`
+- `implementation-defaults.md`
 
 ---
 
@@ -94,22 +95,55 @@ export default async function DashboardPage() {
 
 **Fastify is the standard backend framework** for the orchestrator service.
 
-**Route handlers should stay thin** — authenticate/authorize, validate input, call a service, map result to HTTP response, emit telemetry. Do not place large business workflows directly in route files.
+## Mandatory Directory Structure
 
-**Services own business logic** — Organize backend logic into services with responsibilities like: applying business rules, reading/writing PostgreSQL, interacting with Blob Storage, invoking AI providers, enqueueing jobs, handling retries and fallback behavior.
+The orchestrator uses a predictable directory layout:
 
-**Validate at boundaries** — Every inbound request should be validated (route params, query params, request body, file metadata, tool input/output) before entering core business logic.
+| Directory | Purpose |
+|-----------|---------|
+| `routes/` | Thin HTTP handlers — no business logic |
+| `services/` | Business logic + data access — one service per domain entity |
+| `middleware/` | Cross-cutting concerns (auth, logging, error handling) |
+| `lib/` | Utilities, config, db pool/client, typed errors, response helpers |
+| `telemetry/` | OpenTelemetry setup, custom spans, metrics |
 
-**Fastify route handler with typed response:**
+## Route Handler Formula (Mandatory)
+
+Every route handler follows this formula: **auth → validate → service.method() → reply**.
+
+Route handlers must stay thin. They authenticate, validate input with Zod, call a service method, and return the response envelope. No business logic, no data access, no complex branching belongs in a route file.
+
+**Services own business logic** — One service per domain entity (e.g., `task-service.ts`, `tag-service.ts`). Services receive typed inputs and authenticated user context as parameters. They apply business rules, read/write via Drizzle, interact with Blob Storage, invoke AI providers, enqueue jobs, and handle retries.
+
+**Validate at boundaries** — Every inbound request must be validated (route params, query params, request body, file metadata, tool input/output) before entering core business logic. Use Zod schemas from `packages/shared/src/validation/` — see `implementation-defaults.md` for validation patterns.
+
+**Fastify route handler with Zod validation and response envelope:**
+
+For a helper-based version using `sendSuccess`, `sendMutationSuccess`, `sendValidationError`, see the `response.ts` and `example-route.ts` asset templates.
+
+```typescript
+fastify.post(
+  '/api/tasks',
+  { preHandler: requireAuth },
+  async (request, reply) => {
+    const parsed = createTaskSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ failed: true, error: 'Validation failed', details: parsed.error.flatten().fieldErrors });
+    const task = await taskService.create(parsed.data, request.user);
+    return reply.code(201).send({ data: task, failed: false });
+  }
+);
+```
+
+**GET handler with response envelope:**
 
 ```typescript
 fastify.get<{ Params: { id: string } }>(
-  '/api/orders/:id',
+  '/api/tasks/:id',
   { preHandler: requireAuth },
   async (request, reply) => {
-    const order = await orderService.getById(request.params.id, request.user);
-    if (!order) return reply.code(404).send({ error: 'Order not found' });
-    return reply.send({ data: order });
+    const task = await taskService.getById(Number(request.params.id), request.user);
+    if (!task) return reply.code(404).send({ failed: true, error: 'Task not found' });
+    return reply.send({ data: task });
   }
 );
 ```
@@ -160,9 +194,13 @@ The backend remains the trust boundary. The UI can hide or show controls, but th
 
 # Service Organization Patterns
 
-**Keep service folders predictable.** Typical orchestrator structure: `routes/`, `services/`, `middleware/`, `lib/`, `telemetry/`. Typical web structure: `app/`, `components/`, `lib/`, `services/` (web-owned helpers only, not core business logic).
+**Orchestrator structure** follows the mandatory directory layout: `routes/`, `services/`, `middleware/`, `lib/`, `telemetry/`. See the "Mandatory Directory Structure" table in the API and Fastify Patterns section.
+
+**Web structure:** `app/`, `components/`, `lib/`, `services/` (web-owned helpers only, not core business logic).
 
 - One clear responsibility per file — do not mix route logic, validation, business logic, and data access in one file
+- One service per domain entity — `task-service.ts`, `tag-service.ts`, `blob-service.ts`
+- Services receive typed inputs and user context — never raw request/reply objects
 - Avoid unnecessary abstraction — "Rule of Two": only generalize once there is real repeated use
 
 ---

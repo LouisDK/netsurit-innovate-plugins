@@ -13,6 +13,18 @@ This skill is the primary consumer of the Architecture Lens agent in review mode
 
 This skill follows the "helpful colleague, not compliance gate" approach. Findings are constructive observations with concrete recommendations — never judgment. The words "violation," "non-compliant," and "failed" are never used. Every finding explains why the pattern exists, not just that it differs from the standard.
 
+When `implementation-defaults.md` is loaded as a reference, the lens agent should check for:
+- Drizzle ORM used for data access (or deviation registered)
+- Zod validation on all API route boundaries
+- Response envelope used consistently: `{ data }` for reads, `{ data, failed: false }` for mutations, `{ failed: true, error }` for errors
+- Route handlers are thin (auth → validate → service → respond)
+- Business logic lives in services, not routes or components
+- Tests use Vitest (unit/integration) and Playwright (E2E)
+- Tests co-located with source files
+- No direct blob storage access from frontend code
+- Naming conventions followed per the naming table
+- Drizzle client not imported in frontend or shared packages
+
 ## When to Run
 
 - Before merging a feature branch — use **Story scope** or **Git changes** to review what's changed
@@ -187,6 +199,7 @@ Loaded on-demand by the lens agent subagent (not by this skill directly):
 | `references/local-development.md` | docker-compose, local dev, .env, dev environment |
 | `references/repo-standards.md` | monorepo, pnpm, packages, repo structure, CLAUDE.md |
 | `references/decision-framework.md` | exception, deviation, trade-off, alternative, decision |
+| `references/implementation-defaults.md` | Zod, validation, schema, safeParse, envelope, response format, blob, upload, TanStack, Tailwind, Prisma, Kysely, Jest, Mocha, Cypress |
 
 ## What This Skill Does Not Do
 

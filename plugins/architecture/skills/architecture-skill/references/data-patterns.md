@@ -2,7 +2,7 @@
 
 Standard data patterns for **single-tenant Azure applications** built on the Azure Single-Tenant Application Standard. Ensures consistent use of data storage, file storage, jobs, schedules, and schema evolution across teams.
 
-Complements: `SKILL.md`, `architecture.md`, `decision-framework.md`, `deployment.md`, `security.md`, `observability.md`
+Complements: `SKILL.md`, `architecture.md`, `decision-framework.md`, `deployment.md`, `security.md`, `observability.md`, `implementation-defaults.md`
 
 ---
 
@@ -74,7 +74,46 @@ Most important tables should include `created_at` and `updated_at`. Where releva
 - **Keep transactions short and focused** — limited to the data consistency boundary. Do not hold transactions open while calling external APIs, waiting on LLM responses, doing CPU-heavy work, or streaming. Persist state, commit, then perform long-running work separately.
 - **Concurrency control** — use the simplest approach that works: optimistic concurrency with a `version` column, row-level locking for job/schedule claims, or application-level idempotency for retryable workflows.
 
+## Standard Data Access: Drizzle ORM
+
+**Drizzle ORM** is the standard database access layer. It provides SQL-first query building with full TypeScript type safety, **drizzle-kit** for schema-driven migrations, and **drizzle-zod** for generating Zod validation schemas from table definitions.
+
+**Why Drizzle over alternatives:**
+- **vs Prisma:** SQL-first with predictable queries, smaller runtime, no binary engine dependency
+- **vs Kysely:** Adds schema definition, migration generation, and Zod integration on top of type-safe queries
+- **vs raw pg:** Doesn't scale to 10+ tables — no type-safe queries, no migration generation, no schema-driven validation
+
+**Conventions:**
+- Table definitions in `packages/shared/src/schema/`
+- Drizzle client (connection pool, query executor) only in `apps/orchestrator/src/lib/db.ts`
+- Frontend and shared packages never import the Drizzle client
+- Migrations output to `schema/migrations/`
+
+**Standard naming:** all tables include `created_at` + `updated_at`, PKs as `id` (bigint generated always as identity — UUIDs remain an approved exception), FKs as `{table_singular}_id`, indexes as `idx_{table}_{columns}`, table names plural snake_case, column names snake_case.
+
+**Example table definition:**
+
+```typescript
+import { pgTable, bigint, text, timestamp, index } from 'drizzle-orm/pg-core';
+
+export const tasks = pgTable('tasks', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  title: text('title').notNull(),
+  status: text('status').notNull().default('pending'),
+  userId: bigint('user_id', { mode: 'number' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_tasks_status').on(table.status),
+  index('idx_tasks_user_id').on(table.userId),
+]);
+```
+
+See `implementation-defaults.md` for Zod validation patterns and the response envelope standard that complement Drizzle.
+
 ## Connection pool helper
+
+For projects using the Drizzle ORM default, see the Drizzle section above. The raw `pg` Pool pattern remains available for projects that register a deviation from Drizzle.
 
 ```typescript
 import { Pool } from "pg";
@@ -99,6 +138,8 @@ Schema changes must be managed through explicit, versioned migrations. Do not re
 - `schema/init.sql` for first-time bootstrap
 - `schema/migrations/001_...sql`, `002_...sql`, etc.
 - Numbered migrations in a predictable sequence
+
+For projects using Drizzle ORM, **drizzle-kit** is the standard migration tool. Run `drizzle-kit generate` to produce migrations from schema changes and `drizzle-kit migrate` to apply them. The output path (`schema/migrations/`) aligns with the numbered SQL convention above.
 
 ## Example migration file (`schema/migrations/002_add_jobs.sql`)
 

@@ -12,16 +12,21 @@ Scan source files, story context, or user input for keywords in the **Signal in 
 
 | Signal in source/context | Reference file loaded |
 |---|---|
-| SQL, queries, migrations, pool, pg, database, schema | `data-patterns.md` |
+| SQL, queries, migrations, pool, pg, database, schema, Drizzle, drizzle-orm, drizzle-kit, drizzle-zod, ORM | `data-patterns.md` |
 | auth, JWT, middleware, Entra, login, RBAC, roles | `security.md` |
 | Dockerfile, container, Bicep, deploy, CI/CD, GitHub Actions | `deployment.md` |
 | health, logging, telemetry, OpenTelemetry, monitor | `observability.md` |
-| Next.js, Fastify, routes, API, SSE, streaming, components | `web-and-api-patterns.md` |
-| test, jest, vitest, coverage, E2E, integration test | `testing.md` |
+| Next.js, Fastify, routes, API, SSE, streaming, components, thin routes, service layer, route handler pattern | `web-and-api-patterns.md` |
+| test, vitest, coverage, E2E, integration test | `testing.md` |
 | docker-compose, local dev, .env, dev environment | `local-development.md` |
 | monorepo, pnpm, packages, repo structure, CLAUDE.md | `repo-standards.md` |
 | architecture, topology, container apps, system shape | `architecture.md` |
 | exception, deviation, trade-off, alternative, decision | `decision-framework.md` |
+| Zod, validation, safeParse, envelope, response format, blob proxy, SAS token, storage proxy | `implementation-defaults.md` |
+| TanStack, React Query, useQuery, useMutation | `implementation-defaults.md` |
+| Tailwind, utility-first, className | `implementation-defaults.md` |
+| Prisma, Kysely, kysely | `implementation-defaults.md` (also load `data-patterns.md` for the Drizzle comparison) |
+| Jest, Mocha, Cypress | `implementation-defaults.md` |
 
 ## Matching Rules
 

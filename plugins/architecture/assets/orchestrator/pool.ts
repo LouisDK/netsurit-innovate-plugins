@@ -4,6 +4,10 @@
  * This is a reference template. Copy to apps/orchestrator/src/pool.ts
  * and adapt to your application's database needs.
  *
+ * Note: Drizzle ORM is now the standard data access layer (see db.ts).
+ * This raw pg Pool template is preserved for projects that register a deviation from Drizzle
+ * or for edge cases where direct SQL is preferred. See data-patterns.md for guidance.
+ *
  * Features:
  * - Lazy singleton pool initialization
  * - Generic query wrapper with type parameter

@@ -1,6 +1,6 @@
 ---
 name: architecture-skill
-description: "Opinionated architectural standard for building single-tenant business applications on Azure. Use when: (1) starting a new greenfield application or project, (2) choosing hosting, compute, identity, data, storage, observability, deployment, CI/CD, or AI integration patterns, (3) deciding between defaults and approved exceptions (e.g. Container Apps vs Functions, PostgreSQL vs Redis), (4) reviewing or auditing an application for alignment with architecture standards, (5) scaffolding a new pnpm monorepo with Next.js + Fastify, (6) refining an existing solution toward better supportability and consistency, or (7) answering questions like 'what should I use for X' where X is any infrastructure, hosting, data, or pattern decision. Common triggers: 'new project', 'greenfield', 'architecture review', 'what database', 'what hosting', 'Azure deployment', 'Container Apps', 'Bicep template', 'pnpm monorepo setup', 'Next.js + Fastify', 'health endpoint', 'background jobs', 'scheduled tasks'."
+description: "Opinionated architectural standard for building single-tenant business applications on Azure. Use when: (1) starting a new greenfield application or project, (2) choosing hosting, compute, identity, data, storage, observability, deployment, CI/CD, or AI integration patterns, (3) deciding between defaults and approved exceptions (e.g. Container Apps vs Functions, PostgreSQL vs Redis), (4) reviewing or auditing an application for alignment with architecture standards, (5) scaffolding a new pnpm monorepo with Next.js + Fastify, (6) refining an existing solution toward better supportability and consistency, or (7) answering questions like 'what should I use for X' where X is any infrastructure, hosting, data, or pattern decision. Common triggers: 'new project', 'greenfield', 'architecture review', 'what database', 'what hosting', 'Azure deployment', 'Container Apps', 'Bicep template', 'pnpm monorepo setup', 'Next.js + Fastify', 'health endpoint', 'background jobs', 'scheduled tasks', 'implementation defaults', 'Drizzle ORM', 'Zod validation', 'API response format', 'response envelope', 'naming conventions', 'blob proxy', 'TanStack Query', 'Tailwind CSS', 'thin routes', 'service layer'."
 ---
 
 # Azure Single-Tenant Application Standard
@@ -196,6 +196,7 @@ Read only the references relevant to the current task. Do not load all reference
 | `references/repo-standards.md` | Setting up pnpm monorepo structure, package layout, or project conventions |
 | `references/testing.md` | Designing test strategy, writing tests, or setting up test infrastructure |
 | `references/local-development.md` | Setting up local development, Docker Compose, dev environment, or .env configuration |
+| `references/implementation-defaults.md` | Choosing validation libraries, API response formats, blob access patterns, naming conventions, or frontend data fetching and styling defaults |
 
 ## Assets
 
@@ -235,6 +236,24 @@ Assets are reference templates. Copy into your project and adapt names, ports, a
 | Asset | Description |
 |-------|-------------|
 | `../../assets/web/Dockerfile` | Multi-stage Next.js standalone build with non-root user |
+| `../../assets/web/providers.tsx` | TanStack Query client provider |
+| `../../assets/web/queries.ts` | TanStack Query example hooks with cache patterns |
+
+### Implementation Defaults
+
+| Asset | Description |
+|-------|-------------|
+| `../../assets/orchestrator/db.ts` | Drizzle ORM database client with connection pool and typed queries |
+| `../../assets/orchestrator/response.ts` | API response envelope helpers (`success`, `error`, `validationError`) |
+| `../../assets/orchestrator/blob-service.ts` | Orchestrator-proxied blob storage service |
+| `../../assets/orchestrator/example-route.ts` | Thin route handler demonstrating auth → validate → service → envelope |
+| `../../assets/orchestrator/example-service.ts` | Domain service demonstrating business logic ownership |
+| `../../assets/shared/schema/tasks.ts` | Drizzle table definitions with drizzle-zod schema generation |
+| `../../assets/shared/validation/tasks.ts` | Hand-written Zod API validation schemas |
+| `../../assets/config/drizzle.config.ts` | Drizzle-kit migration configuration |
+| `../../assets/config/vitest.config.ts` | Vitest workspace test runner configuration |
+| `../../assets/config/playwright.config.ts` | Playwright E2E test configuration |
+| `../../assets/config/tailwind.config.ts` | Tailwind CSS configuration |
 
 ## Output Expectations
 

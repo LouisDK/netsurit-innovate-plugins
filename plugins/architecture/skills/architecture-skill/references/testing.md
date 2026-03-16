@@ -24,6 +24,8 @@ Use **Vitest** as the default test runner for all packages and applications in t
 
 Use `vitest` for unit and integration tests. For end-to-end browser tests, Playwright remains the standard choice.
 
+**Jest, Mocha, and Cypress are non-standard.** Projects using these runners must register a deviation (`DEV-NNN` in `docs/architecture-deviations.md`) with rationale for why Vitest or Playwright cannot meet the requirement.
+
 ---
 
 # Standard Test Layers
